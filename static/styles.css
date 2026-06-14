@@ -227,6 +227,32 @@ button:hover {
   background: #263241;
 }
 
+button:disabled {
+  opacity: 0.58;
+  cursor: not-allowed;
+}
+
+.prompt-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.prompt-row button {
+  min-height: 34px;
+  margin: 0;
+  padding: 6px 11px;
+  color: var(--surface-strong);
+  background: #edf2f7;
+  border: 1px solid #dce4ed;
+  border-radius: 999px;
+  font-size: 0.88rem;
+}
+
+.prompt-row button:hover {
+  background: #dde8ee;
+}
+
 .button-row {
   display: grid;
   grid-template-columns: minmax(96px, 0.28fr) 1fr;
@@ -282,6 +308,10 @@ button:hover {
   font-size: 1.8rem;
 }
 
+.analysis-score strong.negative {
+  color: var(--red);
+}
+
 .analysis-meta {
   display: flex;
   flex-wrap: wrap;
@@ -291,6 +321,21 @@ button:hover {
 .analysis-result p {
   color: var(--text);
   line-height: 1.55;
+}
+
+.tag-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.tag-row span {
+  padding: 4px 8px;
+  color: #36515e;
+  background: #eef6f3;
+  border: 1px solid #d8ebe5;
+  border-radius: 999px;
+  font-size: 0.78rem;
 }
 
 .metrics-card {
@@ -412,6 +457,14 @@ button:hover {
   color: var(--muted);
   font-size: 0.86rem;
   line-height: 1.45;
+}
+
+.log-main small {
+  display: block;
+  margin-top: 4px;
+  color: #8a95a3;
+  font-size: 0.78rem;
+  line-height: 1.35;
 }
 
 .delta {

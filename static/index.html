@@ -34,7 +34,7 @@
       <section class="grid">
         <form id="eventForm" class="card input-card">
           <div class="card-title">
-            <h2>AI 修炼记录</h2>
+            <h2>修炼汇报</h2>
             <span id="formStatus"></span>
           </div>
           <label>
@@ -50,6 +50,36 @@
               <option value="idle">闭关走神</option>
             </select>
           </label>
+          <div id="promptRow" class="prompt-row" aria-label="快捷示例">
+            <button
+              type="button"
+              data-type="paper_reading"
+              data-template="读了两小时论文，整理了相关工作脉络和三个可复现实验想法"
+            >
+              论文
+            </button>
+            <button
+              type="button"
+              data-type="experiment_run"
+              data-template="跑了两个小时实验，baseline 已经跑通，记录了 loss 异常和下一步 ablation"
+            >
+              实验
+            </button>
+            <button
+              type="button"
+              data-type="writing"
+              data-template="写了一个半小时论文草稿，补完方法部分并整理了一张结果表"
+            >
+              写作
+            </button>
+            <button
+              type="button"
+              data-type="debugging"
+              data-template="调试了一小时，定位了数据预处理 bug，并修复了训练脚本"
+            >
+              Debug
+            </button>
+          </div>
           <label>
             说说刚才做了什么
             <textarea
@@ -61,7 +91,7 @@
           </label>
           <div class="button-row">
             <button id="voiceButton" class="secondary-button" type="button">语音</button>
-            <button type="submit">AI 评估并记录</button>
+            <button type="submit">生成结果并入账</button>
           </div>
           <p id="voiceStatus" class="voice-status"></p>
           <div id="analysisResult" class="analysis-result empty">还没有评估结果。</div>

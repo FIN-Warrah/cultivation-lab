@@ -129,14 +129,16 @@ function renderLog(log) {
 
   for (const item of log) {
     const metadata = item.metadata || {};
-    const note = metadata.ai_feedback || metadata.note || minutesText(item.duration);
+    const feedback = metadata.ai_feedback || metadata.note || minutesText(item.duration);
+    const detail = metadata.note && metadata.ai_feedback ? metadata.note : minutesText(item.duration);
     const row = document.createElement("div");
     row.className = "log-row";
     row.innerHTML = `
       <time>${item.time}</time>
       <div class="log-main">
         <strong>${escapeHtml(labels[item.type] || item.type)}</strong>
-        <span>${escapeHtml(note)}</span>
+        <span>${escapeHtml(feedback)}</span>
+        <small>${escapeHtml(detail)}</small>
       </div>
       <strong class="delta ${item.delta < 0 ? "negative" : ""}">${signed(item.delta)}</strong>
     `;
@@ -144,26 +146,31 @@ function renderLog(log) {
   }
 }
 
-function renderAnalysis(analysis) {
+function renderAnalysis(analysis, delta) {
   const target = $("#analysisResult");
   if (!analysis) {
     target.className = "analysis-result empty";
-    target.textContent = "还没有评估结果。";
+    target.textContent = "输入一段修炼汇报后，这里会显示修为结果和评语。";
     return;
   }
 
+  const source = analysis.source === "local_ai" ? "本地分析" : "AI 分析";
+  const tagList = (analysis.tags || []).map((tag) => `<span>${escapeHtml(tag)}</span>`).join("");
+  const resultDelta = Number(delta ?? analysis.estimated_delta);
   target.className = "analysis-result";
   target.innerHTML = `
     <div class="analysis-score">
-      <span>AI 估算</span>
-      <strong>${signed(analysis.estimated_delta)}</strong>
+      <span>本次修为</span>
+      <strong class="${resultDelta < 0 ? "negative" : ""}">${signed(resultDelta)}</strong>
     </div>
     <div class="analysis-meta">
       <span>${analysis.duration_minutes} 分钟</span>
-      <span>质量 ${analysis.quality.toFixed(2)}</span>
+      <span>质量 ${Number(analysis.quality).toFixed(2)}</span>
       <span>把握 ${Math.round(analysis.confidence * 100)}%</span>
+      <span>${escapeHtml(source)}</span>
     </div>
     <p>${escapeHtml(analysis.feedback)}</p>
+    <div class="tag-row">${tagList}</div>
   `;
 }
 
@@ -173,7 +180,7 @@ async function submitEvent(event) {
   submitting = true;
 
   const formStatus = $("#formStatus");
-  formStatus.textContent = "AI 分析中";
+  formStatus.textContent = "推演中";
 
   const note = $("#note").value.trim();
   if (!note) {
@@ -194,9 +201,9 @@ async function submitEvent(event) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     });
-    renderAnalysis(result.analysis);
+    renderAnalysis(result.analysis, result.accepted?.delta);
     $("#note").value = "";
-    formStatus.textContent = "已记录";
+    formStatus.textContent = "已入账";
     await refresh();
   } catch (error) {
     formStatus.textContent = error.message;
@@ -205,10 +212,22 @@ async function submitEvent(event) {
   }
 }
 
+function applyTemplate(event) {
+  const button = event.target.closest("[data-template]");
+  if (!button) return;
+  $("#eventType").value = button.dataset.type;
+  $("#note").value = button.dataset.template;
+  $("#note").focus();
+  $("#formStatus").textContent = "";
+  renderAnalysis(null);
+}
+
 const eventForm = $("#eventForm");
 eventForm.addEventListener("submit", submitEvent);
 eventForm.querySelector('button[type="submit"]').addEventListener("click", submitEvent);
+$("#promptRow").addEventListener("click", applyTemplate);
 setupVoiceInput();
+renderAnalysis(null);
 refresh().catch((error) => {
   $("#narrative").textContent = error.message;
 });
