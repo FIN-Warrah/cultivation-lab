@@ -1,0 +1,10 @@
+[project]
+name = "cultivation-lab"
+version = "0.1.0"
+description = "A gamified academic behavior tracker that maps research activity into cultivation power and realms."
+requires-python = ">=3.10"
+dependencies = []
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]

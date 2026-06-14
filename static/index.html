@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Cultivation Lab</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <section class="hero-panel">
+        <div>
+          <p class="eyebrow">Cultivation Lab</p>
+          <h1 id="realm">炼气期</h1>
+          <p id="narrative" class="narrative">正在读取今日修炼报告。</p>
+        </div>
+        <div class="power-readout">
+          <span class="label">修为</span>
+          <strong id="power">0</strong>
+          <span id="nextRealm">下一境界：筑基期</span>
+        </div>
+      </section>
+
+      <section class="progress-panel" aria-label="境界进度">
+        <div class="progress-copy">
+          <span>境界进度</span>
+          <strong id="progressText">0%</strong>
+        </div>
+        <div class="progress-track">
+          <div id="progressBar" class="progress-bar"></div>
+        </div>
+      </section>
+
+      <section class="grid">
+        <form id="eventForm" class="card input-card">
+          <div class="card-title">
+            <h2>AI 修炼记录</h2>
+            <span id="formStatus"></span>
+          </div>
+          <label>
+            类别
+            <select id="eventType" name="type">
+              <option value="coding">编码炼器</option>
+              <option value="paper_reading">参悟论文</option>
+              <option value="experiment_run">实验突破</option>
+              <option value="writing">凝练文稿</option>
+              <option value="debugging">排障破阵</option>
+              <option value="meeting">同门论道</option>
+              <option value="browsing">杂念游荡</option>
+              <option value="idle">闭关走神</option>
+            </select>
+          </label>
+          <label>
+            说说刚才做了什么
+            <textarea
+              id="note"
+              name="note"
+              maxlength="520"
+              placeholder="比如：看了两小时 diffusion 相关论文，整理了三条可复现实验思路"
+            ></textarea>
+          </label>
+          <div class="button-row">
+            <button id="voiceButton" class="secondary-button" type="button">语音</button>
+            <button type="submit">AI 评估并记录</button>
+          </div>
+          <p id="voiceStatus" class="voice-status"></p>
+          <div id="analysisResult" class="analysis-result empty">还没有评估结果。</div>
+        </form>
+
+        <section class="card metrics-card">
+          <div class="metric">
+            <span>今日变化</span>
+            <strong id="dailyDelta">+0</strong>
+          </div>
+          <div class="metric">
+            <span>心魔风险</span>
+            <strong id="risk">0%</strong>
+          </div>
+          <div class="risk-track">
+            <div id="riskBar"></div>
+          </div>
+          <ul id="warnings" class="warnings"></ul>
+        </section>
+
+        <section class="card report-card">
+          <div class="card-title">
+            <h2>今日分布</h2>
+            <span id="eventCount">0 条</span>
+          </div>
+          <div id="summary" class="summary"></div>
+        </section>
+
+        <section class="card log-card">
+          <div class="card-title">
+            <h2>修炼日志</h2>
+            <span id="reportDate"></span>
+          </div>
+          <div id="log" class="log"></div>
+        </section>
+      </section>
+    </main>
+    <script src="/app.js" defer></script>
+  </body>
+</html>
