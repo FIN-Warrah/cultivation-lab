@@ -10,7 +10,16 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
 from .analyzer import ActivityAnalyzer, analysis_metadata
-from .config import DEFAULT_EVENTS_PATH, EVENT_LABELS, EVENT_TYPES, STATIC_DIR, WEIGHTS
+from .config import (
+    ACADEMIC_TRACK_LABELS,
+    ACADEMIC_TRACKS,
+    DEFAULT_EVENTS_PATH,
+    EVENT_LABELS,
+    EVENT_TYPES,
+    STATIC_DIR,
+    WEIGHTS,
+    normalize_academic_track,
+)
 from .engine import CultivationEngine
 from .models import Event, ValidationError, utc_now_ts
 from .store import JsonEventStore
@@ -37,6 +46,8 @@ class CultivationRequestHandler(BaseHTTPRequestHandler):
                 {
                     "event_types": EVENT_TYPES,
                     "event_labels": EVENT_LABELS,
+                    "academic_tracks": ACADEMIC_TRACKS,
+                    "academic_track_labels": ACADEMIC_TRACK_LABELS,
                     "weights": WEIGHTS,
                 }
             )
@@ -57,6 +68,8 @@ class CultivationRequestHandler(BaseHTTPRequestHandler):
                 {
                     "event_types": EVENT_TYPES,
                     "event_labels": EVENT_LABELS,
+                    "academic_tracks": ACADEMIC_TRACKS,
+                    "academic_track_labels": ACADEMIC_TRACK_LABELS,
                     "weights": WEIGHTS,
                 },
                 include_body=False,
@@ -149,8 +162,9 @@ class CultivationRequestHandler(BaseHTTPRequestHandler):
             if not note:
                 raise ValidationError("note is required.")
 
+            track = normalize_academic_track(payload.get("track") or payload.get("academic_track"))
             timestamp = int(payload.get("timestamp") or utc_now_ts())
-            analysis = self.analyzer.analyze(event_type=event_type, note=note)
+            analysis = self.analyzer.analyze(event_type=event_type, note=note, track=track)
             event = Event.from_payload(
                 {
                     "type": event_type,

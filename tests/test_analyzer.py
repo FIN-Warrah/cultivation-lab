@@ -65,6 +65,48 @@ class ActivityAnalyzerTest(unittest.TestCase):
         self.assertGreaterEqual(result.estimated_delta, 5000)
         self.assertIn("大乘初成", result.tags)
 
+    def test_phd_defense_passed_triggers_ascension(self) -> None:
+        analyzer = ActivityAnalyzer(use_remote=False)
+
+        result = analyzer.analyze("meeting", "今天博士毕业答辩顺利通过", track="phd")
+
+        self.assertEqual(result.track, "phd")
+        self.assertIsNotNone(result.milestone)
+        self.assertEqual(result.milestone["title"], "天门大开")
+        self.assertEqual(result.milestone["realm_target"], "飞升期")
+        self.assertEqual(result.milestone["realm_floor_power"], 8000)
+        self.assertGreaterEqual(result.estimated_delta, 8000)
+
+    def test_direct_phd_defense_has_long_pathwording(self) -> None:
+        analyzer = ActivityAnalyzer(use_remote=False)
+
+        result = analyzer.analyze("meeting", "今天毕业答辩顺利通过", track="direct_phd")
+
+        self.assertIsNotNone(result.milestone)
+        self.assertEqual(result.milestone["title"], "长阶飞升")
+        self.assertEqual(result.milestone["realm_target"], "飞升期")
+        self.assertEqual(result.milestone["realm_floor_power"], 8000)
+
+    def test_master_phd_master_defense_is_front_tribulation(self) -> None:
+        analyzer = ActivityAnalyzer(use_remote=False)
+
+        result = analyzer.analyze("meeting", "硕士毕业答辩顺利通过", track="master_phd")
+
+        self.assertIsNotNone(result.milestone)
+        self.assertEqual(result.milestone["title"], "前劫已渡")
+        self.assertEqual(result.milestone["realm_target"], "渡劫期")
+        self.assertEqual(result.milestone["realm_floor_power"], 3000)
+
+    def test_master_phd_final_defense_triggers_ascension(self) -> None:
+        analyzer = ActivityAnalyzer(use_remote=False)
+
+        result = analyzer.analyze("meeting", "博士毕业答辩顺利通过", track="master_phd")
+
+        self.assertIsNotNone(result.milestone)
+        self.assertEqual(result.milestone["title"], "双劫尽渡")
+        self.assertEqual(result.milestone["realm_target"], "飞升期")
+        self.assertEqual(result.milestone["realm_floor_power"], 8000)
+
     def test_breakthrough_gets_insight_bonus(self) -> None:
         analyzer = ActivityAnalyzer(use_remote=False)
 

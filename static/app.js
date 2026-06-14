@@ -9,6 +9,13 @@ const labels = {
   idle: "神游太虚",
 };
 
+const trackLabels = {
+  master: "硕士一程",
+  phd: "博士一程",
+  direct_phd: "直博玄门",
+  master_phd: "硕博连修",
+};
+
 const state = {
   snapshot: null,
   report: null,
@@ -140,7 +147,8 @@ function renderLog(log) {
     const metadata = item.metadata || {};
     const feedback = metadata.ai_feedback || metadata.note || minutesText(item.duration);
     const milestone = metadata.milestone || null;
-    const detail = milestone?.description || (metadata.tags || []).slice(0, 3).join(" · ") || minutesText(item.duration);
+    const detailText = milestone?.description || (metadata.tags || []).slice(0, 3).join(" · ") || minutesText(item.duration);
+    const detail = [metadata.track_label, detailText].filter(Boolean).join(" · ");
     const milestoneHtml = milestone
       ? `<b class="log-milestone">${escapeHtml(milestone.title || metadata.milestone_title || "天机显化")}</b>`
       : "";
@@ -168,6 +176,7 @@ function renderAnalysis(analysis, delta) {
   }
 
   const source = analysis.source === "local_ai" ? "本地灵签" : "天机判词";
+  const trackName = analysis.track_label || trackLabels[analysis.track] || trackLabels[$("#track").value];
   const tagList = (analysis.tags || []).map((tag) => `<span>${escapeHtml(tag)}</span>`).join("");
   const resultDelta = Number(delta ?? analysis.estimated_delta);
   const milestone = analysis.milestone || null;
@@ -196,6 +205,7 @@ function renderAnalysis(analysis, delta) {
       <span>${cultivationTime(analysis.duration_minutes)}</span>
       <span>火候 ${Number(analysis.quality).toFixed(2)}</span>
       <span>灵验 ${Math.round(analysis.confidence * 100)}%</span>
+      <span>${escapeHtml(trackName)}</span>
       <span>${escapeHtml(source)}</span>
     </div>
     ${milestoneBlock}
@@ -221,6 +231,7 @@ async function submitEvent(event) {
 
   const payload = {
     type: $("#eventType").value,
+    track: $("#track").value,
     note,
     timestamp: Math.floor(Date.now() / 1000),
   };
@@ -253,6 +264,13 @@ function applyTemplate(event) {
 }
 
 const eventForm = $("#eventForm");
+const savedTrack = localStorage.getItem("cultivationTrack");
+if (trackLabels[savedTrack]) {
+  $("#track").value = savedTrack;
+}
+$("#track").addEventListener("change", () => {
+  localStorage.setItem("cultivationTrack", $("#track").value);
+});
 eventForm.addEventListener("submit", submitEvent);
 eventForm.querySelector('button[type="submit"]').addEventListener("click", submitEvent);
 $("#promptRow").addEventListener("click", applyTemplate);

@@ -31,6 +31,41 @@ EVENT_LABELS = {
     "idle": "神游太虚",
 }
 
+ACADEMIC_TRACKS = (
+    "master",
+    "phd",
+    "direct_phd",
+    "master_phd",
+)
+
+DEFAULT_ACADEMIC_TRACK = "master"
+
+ACADEMIC_TRACK_LABELS = {
+    "master": "硕士一程",
+    "phd": "博士一程",
+    "direct_phd": "直博玄门",
+    "master_phd": "硕博连修",
+}
+
+ACADEMIC_TRACK_ALIASES = {
+    "master_only": "master",
+    "masters": "master",
+    "硕士": "master",
+    "读研": "master",
+    "只读研": "master",
+    "phd_only": "phd",
+    "doctoral": "phd",
+    "博士": "phd",
+    "只读博": "phd",
+    "direct": "direct_phd",
+    "directphd": "direct_phd",
+    "直博": "direct_phd",
+    "combined": "master_phd",
+    "master_to_phd": "master_phd",
+    "硕博连读": "master_phd",
+    "硕博连修": "master_phd",
+}
+
 WEIGHTS = {
     "coding": 10.0,
     "paper_reading": 8.0,
@@ -56,3 +91,16 @@ REALM_THRESHOLDS = (
 DECAY_RATE_PER_DAY = 0.03
 HEART_DEMON_BROWSING_HOURS = 2.0
 HEART_DEMON_FRAGMENTATION = 12.0
+
+
+def normalize_academic_track(value: object) -> str:
+    raw = str(value or DEFAULT_ACADEMIC_TRACK).strip()
+    if raw in ACADEMIC_TRACKS:
+        return raw
+    compact = raw.lower().replace("-", "_").replace(" ", "_")
+    return ACADEMIC_TRACK_ALIASES.get(compact, DEFAULT_ACADEMIC_TRACK)
+
+
+def academic_track_label(track: object) -> str:
+    normalized = normalize_academic_track(track)
+    return ACADEMIC_TRACK_LABELS[normalized]

@@ -182,6 +182,12 @@ h2 {
   gap: 14px;
 }
 
+.form-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 0.92fr) minmax(0, 1.08fr);
+  gap: 12px;
+}
+
 label {
   display: grid;
   gap: 7px;
@@ -564,6 +570,10 @@ button:disabled {
   }
 
   .button-row {
+    grid-template-columns: 1fr;
+  }
+
+  .form-grid {
     grid-template-columns: 1fr;
   }
 

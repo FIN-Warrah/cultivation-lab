@@ -107,6 +107,15 @@ The note analyzer uses this for breakthrough-style moments such as 有所感、�
 
 The dashboard uses the note-based endpoint by default. The browser voice button uses the built-in Web Speech API when available, converts speech to text locally in the browser, then sends the text to `/event/from-note`.
 
+Natural-language entries can include an academic track:
+
+- `master`: 硕士一程
+- `phd`: 博士一程
+- `direct_phd`: 直博玄门
+- `master_phd`: 硕博连修
+
+The track changes milestone strength. For example, a master defense pass enters `大乘期`, while doctoral/direct-PhD final defenses can enter `飞升期`; `master_phd` treats an explicit 硕士答辩 as a front tribulation and 博士/ final defense as the second tribulation.
+
 Realm thresholds:
 
 - `< 100`: 炼气期

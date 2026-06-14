@@ -37,19 +37,30 @@
             <h2>今日修行录</h2>
             <span id="formStatus"></span>
           </div>
-          <label>
-            修行法门
-            <select id="eventType" name="type">
-              <option value="coding">符阵炼器</option>
-              <option value="paper_reading">玉简参悟</option>
-              <option value="experiment_run">丹炉试炼</option>
-              <option value="writing">道卷成章</option>
-              <option value="debugging">破阵除障</option>
-              <option value="meeting">同门论道</option>
-              <option value="browsing">心猿游荡</option>
-              <option value="idle">神游太虚</option>
-            </select>
-          </label>
+          <div class="form-grid">
+            <label>
+              本命道途
+              <select id="track" name="track">
+                <option value="master">硕士一程</option>
+                <option value="phd">博士一程</option>
+                <option value="direct_phd">直博玄门</option>
+                <option value="master_phd">硕博连修</option>
+              </select>
+            </label>
+            <label>
+              修行法门
+              <select id="eventType" name="type">
+                <option value="coding">符阵炼器</option>
+                <option value="paper_reading">玉简参悟</option>
+                <option value="experiment_run">丹炉试炼</option>
+                <option value="writing">道卷成章</option>
+                <option value="debugging">破阵除障</option>
+                <option value="meeting">同门论道</option>
+                <option value="browsing">心猿游荡</option>
+                <option value="idle">神游太虚</option>
+              </select>
+            </label>
+          </div>
           <div id="promptRow" class="prompt-row" aria-label="快捷示例">
             <button
               type="button"

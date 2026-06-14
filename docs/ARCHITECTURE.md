@@ -68,6 +68,8 @@ Natural-language entries are converted into the same contract. The analyzer stor
 
 ```json
 {
+  "track": "master_phd",
+  "track_label": "硕博连修",
   "quality": 1.34,
   "note": "跑了两个小时 baseline，定位了 loss 问题",
   "ai_feedback": "一线灵光贯穿泥丸宫...",
@@ -80,3 +82,4 @@ Natural-language entries are converted into the same contract. The analyzer stor
 ```
 
 Milestone metadata is optional. When present, `bonus_power` is added to the ordinary weighted score, and `realm_floor_power` can lift the replayed state directly to a realm threshold.
+The analyzer accepts four tracks: `master`, `phd`, `direct_phd`, and `master_phd`. Track selection changes the milestone table for proposal, midterm/qualifying, thesis submission, paper submission/acceptance, and defense events.

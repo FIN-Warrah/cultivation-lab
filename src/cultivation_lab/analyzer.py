@@ -8,7 +8,13 @@ import urllib.request
 from dataclasses import dataclass
 from typing import Any
 
-from .config import EVENT_LABELS, WEIGHTS
+from .config import (
+    DEFAULT_ACADEMIC_TRACK,
+    EVENT_LABELS,
+    WEIGHTS,
+    academic_track_label,
+    normalize_academic_track,
+)
 
 
 DEFAULT_MINUTES = {
@@ -121,6 +127,8 @@ class ActivityAnalysis:
     tags: tuple[str, ...]
     feedback: str
     milestone: dict[str, Any] | None = None
+    track: str = DEFAULT_ACADEMIC_TRACK
+    track_label: str = academic_track_label(DEFAULT_ACADEMIC_TRACK)
     source: str = "local_ai"
 
     def to_dict(self) -> dict:
@@ -135,6 +143,8 @@ class ActivityAnalysis:
             "tags": list(self.tags),
             "feedback": self.feedback,
             "milestone": self.milestone,
+            "track": self.track,
+            "track_label": self.track_label,
             "source": self.source,
         }
 
@@ -147,23 +157,24 @@ class ActivityAnalyzer:
             self.remote = remote if remote is not None else OpenAIActivityAnalyzer.from_env()
         self.local = LocalActivityAnalyzer()
 
-    def analyze(self, event_type: str, note: str) -> ActivityAnalysis:
+    def analyze(self, event_type: str, note: str, track: str = DEFAULT_ACADEMIC_TRACK) -> ActivityAnalysis:
         if self.remote is not None:
             try:
-                return self.remote.analyze(event_type=event_type, note=note)
+                return self.remote.analyze(event_type=event_type, note=note, track=track)
             except AnalysisProviderError:
                 pass
-        return self.local.analyze(event_type=event_type, note=note)
+        return self.local.analyze(event_type=event_type, note=note, track=track)
 
 
 class LocalActivityAnalyzer:
-    def analyze(self, event_type: str, note: str) -> ActivityAnalysis:
+    def analyze(self, event_type: str, note: str, track: str = DEFAULT_ACADEMIC_TRACK) -> ActivityAnalysis:
+        track = normalize_academic_track(track)
         clean_note = " ".join((note or "").strip().split())
         duration_minutes, duration_confidence = infer_duration_minutes(clean_note, event_type)
         quality, tags = infer_quality(clean_note, event_type)
         weight = WEIGHTS.get(event_type, 0.0)
         base_delta = round(weight * (duration_minutes / 60.0) * quality, 2)
-        milestone = detect_milestone(clean_note, event_type)
+        milestone = detect_milestone(clean_note, event_type, track=track)
         estimated_delta = apply_milestone_delta(base_delta, milestone)
         cultivation_tags = xianxia_tags(tags, event_type, estimated_delta)
         if milestone:
@@ -194,6 +205,8 @@ class LocalActivityAnalyzer:
             tags=tuple(cultivation_tags),
             feedback=feedback,
             milestone=milestone,
+            track=track,
+            track_label=academic_track_label(track),
         )
 
 
@@ -228,8 +241,10 @@ class OpenAIActivityAnalyzer:
             timeout_seconds=_env_float("CULTIVATION_AI_TIMEOUT", 20.0),
         )
 
-    def analyze(self, event_type: str, note: str) -> ActivityAnalysis:
+    def analyze(self, event_type: str, note: str, track: str = DEFAULT_ACADEMIC_TRACK) -> ActivityAnalysis:
+        track = normalize_academic_track(track)
         label = EVENT_LABELS.get(event_type, event_type)
+        track_label = academic_track_label(track)
         payload = {
             "model": self.model,
             "input": [
@@ -247,6 +262,7 @@ class OpenAIActivityAnalyzer:
                     "role": "user",
                     "content": (
                         f"行为类别: {event_type} / {label}\n"
+                        f"本命道途: {track_label}\n"
                         f"类别权重: {WEIGHTS.get(event_type, 0.0)}\n"
                         f"用户描述: {note}\n\n"
                         "请返回字段: duration_minutes(int,1-720), quality(number,0.25-1.85), "
@@ -306,7 +322,7 @@ class OpenAIActivityAnalyzer:
         if event_type in {"browsing", "idle"}:
             quality = min(quality, 1.0)
         base_delta = round(WEIGHTS.get(event_type, 0.0) * (duration_minutes / 60.0) * quality, 2)
-        milestone = detect_milestone(note, event_type)
+        milestone = detect_milestone(note, event_type, track=track)
         estimated_delta = apply_milestone_delta(base_delta, milestone)
         tags = xianxia_tags(_normalize_tags(parsed.get("tags")), event_type, estimated_delta)
         if milestone:
@@ -338,6 +354,8 @@ class OpenAIActivityAnalyzer:
             tags=tuple(tags),
             feedback=feedback,
             milestone=milestone,
+            track=track,
+            track_label=track_label,
             source=f"openai:{self.model}",
         )
 
@@ -397,7 +415,12 @@ def infer_quality(note: str, event_type: str) -> tuple[float, list[str]]:
     return quality, _dedupe(tags)[:4]
 
 
-def detect_milestone(note: str, event_type: str) -> dict[str, Any] | None:
+def detect_milestone(
+    note: str,
+    event_type: str,
+    track: str = DEFAULT_ACADEMIC_TRACK,
+) -> dict[str, Any] | None:
+    track = normalize_academic_track(track)
     clean = " ".join((note or "").strip().split())
     lower = clean.lower()
     if not clean:
@@ -412,29 +435,9 @@ def detect_milestone(note: str, event_type: str) -> dict[str, Any] | None:
         )
     )
     if defense_passed:
-        return _milestone(
-            key="defense_passed",
-            title="雷劫已渡",
-            description="劫云散尽，法身无损，已踏入大乘门槛。",
-            bonus_power=2200,
-            realm_target="大乘期",
-            realm_floor_power=5000,
-            tags=("雷劫已渡", "大乘初成", "天门近启"),
-            feedback="劫雷既散，元神归位。此番关隘已破，法身入大乘之门，余下只待温养圆满。",
-            confidence=0.94,
-        )
+        return _defense_milestone(track, lower, passed=True)
     if has_defense:
-        return _milestone(
-            key="defense_started",
-            title="雷劫将临",
-            description="劫云已聚，道场将启，境界稳入渡劫门前。",
-            bonus_power=1200,
-            realm_target="渡劫期",
-            realm_floor_power=3000,
-            tags=("雷劫将临", "劫云压顶", "道心凝定"),
-            feedback="雷劫之云已在天穹聚合，道场将开。此事非寻常功课，可直入渡劫之境，宜稳住道心备迎天雷。",
-            confidence=0.92,
-        )
+        return _defense_milestone(track, lower, passed=False)
 
     thesis_terms = (
         "提交学位论文",
@@ -445,86 +448,33 @@ def detect_milestone(note: str, event_type: str) -> dict[str, Any] | None:
         "dissertation submitted",
     )
     if _has_any(lower, thesis_terms):
-        return _milestone(
-            key="thesis_submitted",
-            title="渡劫书成",
-            description="本命道卷已呈宗门，天雷之期近在眼前。",
-            bonus_power=1400,
-            realm_target="渡劫期",
-            realm_floor_power=3000,
-            tags=("渡劫书成", "宗门验卷", "劫期将至"),
-            feedback="本命道卷已呈宗门，千日灵纹汇作一章。此为渡劫前的大成节点，气海当有骤涨之象。",
-            confidence=0.91,
-        )
+        return _thesis_milestone(track, lower)
 
     paper_terms = ("论文", "paper", "稿件", "投稿", "会议", "期刊", "journal", "conference", "manuscript")
     accepted_terms = ("录用", "接收", "中稿", "命中", "accept", "accepted")
     if _has_any(lower, accepted_terms) and _has_any(lower, paper_terms):
-        return _milestone(
-            key="paper_accepted",
-            title="仙门赐符",
-            description="外门金榜有名，道法已得仙门印证。",
-            bonus_power=1200,
-            realm_target="化神期",
-            realm_floor_power=1500,
-            tags=("仙门赐符", "金榜有名", "道法印证"),
-            feedback="仙门赐符，金榜留名。此番道法已得外界印证，神识暴涨，足以稳住化神门庭。",
-            confidence=0.9,
-        )
+        return _paper_milestone(track, accepted=True)
 
     submit_terms = ("投稿", "提交", "submit", "submitted", "arxiv", "openreview", "投出去")
     if _has_any(lower, submit_terms) and _has_any(lower, paper_terms):
-        return _milestone(
-            key="paper_submitted",
-            title="叩问仙门",
-            description="道卷已出洞府，向山门递上第一道符。",
-            bonus_power=620,
-            realm_target="元婴期",
-            realm_floor_power=800,
-            tags=("叩问仙门", "道卷出山", "灵符已递"),
-            feedback="道卷已离洞府，叩问仙门。此举虽未定成败，却已跨过闭门独修之关，元婴灵机可由此凝实。",
-            confidence=0.86,
-        )
+        return _paper_milestone(track, accepted=False)
+
+    midterm_terms = ("中期", "资格考", "qualifying", "prelim", "candidacy", "转博")
+    midterm_passed = _has_any(lower, midterm_terms) and _has_any(lower, ("通过", "过了", "完成", "passed"))
+    if midterm_passed:
+        return _midterm_milestone(track, passed=True)
+    if _has_any(lower, midterm_terms):
+        return _midterm_milestone(track, passed=False)
 
     proposal_passed = "开题" in clean and _has_any(lower, ("通过", "过了", "完成", "passed"))
     if proposal_passed:
-        return _milestone(
-            key="proposal_passed",
-            title="筑坛立誓",
-            description="道途初定，命灯已悬，金丹之基由此成形。",
-            bonus_power=260,
-            realm_target="金丹期",
-            realm_floor_power=300,
-            tags=("筑坛立誓", "金丹有影", "道途初定"),
-            feedback="命灯已悬，道途初定。此关一过，散乱灵机开始结丹，往后可循此脉络稳步炼化。",
-            confidence=0.86,
-        )
+        return _proposal_milestone(track, lower, passed=True)
     if "开题" in clean:
-        return _milestone(
-            key="proposal_started",
-            title="立道基",
-            description="初开山门，择定一条可长期温养的道脉。",
-            bonus_power=120,
-            realm_target="筑基期",
-            realm_floor_power=100,
-            tags=("立道基", "择脉开山", "根骨渐稳"),
-            feedback="山门初开，道脉已有雏形。此非一日小功，而是筑基之始，宜把灵机收束成可久修之法。",
-            confidence=0.8,
-        )
+        return _proposal_milestone(track, lower, passed=False)
 
     done_terms = ("定稿", "终稿", "camera-ready", "返修完成", "rebuttal完成", "rebuttal finished")
     if _has_any(lower, done_terms):
-        return _milestone(
-            key="manuscript_finalized",
-            title="道卷定形",
-            description="散乱灵纹归于一册，元婴之相更加稳固。",
-            bonus_power=700,
-            realm_target="元婴期",
-            realm_floor_power=800,
-            tags=("道卷定形", "灵纹归册", "元婴渐稳"),
-            feedback="道卷定形，灵纹归册。此前零散火候今日并作一炉，气脉自然比寻常书写更为充沛。",
-            confidence=0.84,
-        )
+        return _finalized_milestone(track)
 
     breakthrough_terms = (
         "突破",
@@ -549,6 +499,7 @@ def detect_milestone(note: str, event_type: str) -> dict[str, Any] | None:
             tags=("有所悟", "瓶颈初破", "灵台大明"),
             feedback="一线灵光贯穿泥丸宫，旧日关隘已有裂纹。此乃真悟，不必拘泥时辰，灵力当按大功记入。",
             confidence=0.84,
+            track=track,
         )
 
     insight_terms = ("有所感", "悟到", "明白了", "理解了", "理清", "思路清楚", "有点理解")
@@ -563,9 +514,321 @@ def detect_milestone(note: str, event_type: str) -> dict[str, Any] | None:
             tags=("有所感", "心湖微明", "灵机可养"),
             feedback="心湖微明，灵机初现。此类感应虽未成雷霆，却能滋养后续关窍，宜趁热写入玉简。",
             confidence=0.78,
+            track=track,
         )
 
     return None
+
+
+MASTER_STAGE_TERMS = ("硕士", "硕论", "master")
+DOCTORAL_STAGE_TERMS = ("博士", "博论", "phd", "doctoral", "doctor")
+
+
+def _master_stage(track: str, lower: str) -> bool:
+    if track == "master":
+        return True
+    if track != "master_phd":
+        return False
+    return _has_any(lower, MASTER_STAGE_TERMS) and not _has_any(lower, DOCTORAL_STAGE_TERMS)
+
+
+def _doctoral_stage(track: str, lower: str = "") -> bool:
+    if track in {"phd", "direct_phd"}:
+        return True
+    if track == "master_phd":
+        return not _master_stage(track, lower)
+    return False
+
+
+def _defense_milestone(track: str, lower: str, passed: bool) -> dict[str, Any]:
+    if passed and _master_stage(track, lower):
+        return _milestone(
+            key="master_defense_passed" if track == "master_phd" else "defense_passed",
+            title="前劫已渡" if track == "master_phd" else "雷劫已渡",
+            description="前路劫云暂散，道基已足以承接后一重长阶。" if track == "master_phd" else "劫云散尽，法身无损，已踏入大乘门槛。",
+            bonus_power=1600 if track == "master_phd" else 2200,
+            realm_target="渡劫期" if track == "master_phd" else "大乘期",
+            realm_floor_power=3000 if track == "master_phd" else 5000,
+            tags=("前劫已渡", "道基厚成", "后程可启") if track == "master_phd" else ("雷劫已渡", "大乘初成", "天门近启"),
+            feedback=(
+                "前劫既过，道基已厚。此关不是终点，而是为后一重天路蓄势，往后可开更深道藏。"
+                if track == "master_phd"
+                else "劫雷既散，元神归位。此番关隘已破，法身入大乘之门，余下只待温养圆满。"
+            ),
+            confidence=0.94,
+            track=track,
+        )
+    if passed and track == "direct_phd":
+        return _milestone(
+            key="direct_phd_defense_passed",
+            title="长阶飞升",
+            description="一条长阶贯通始终，万重劫火尽归清明。",
+            bonus_power=3600,
+            realm_target="飞升期",
+            realm_floor_power=8000,
+            tags=("长阶飞升", "万劫圆成", "天门大开"),
+            feedback="长阶独行至此，万重劫火俱已化作清明。此番非寻常雷劫已渡，而是天门大开，可记飞升之功。",
+            confidence=0.96,
+            track=track,
+        )
+    if passed and _doctoral_stage(track, lower):
+        return _milestone(
+            key="doctoral_defense_passed" if track == "phd" else "dual_defense_passed",
+            title="天门大开" if track == "phd" else "双劫尽渡",
+            description="万重劫火尽散，法身已临飞升门前。",
+            bonus_power=3400,
+            realm_target="飞升期",
+            realm_floor_power=8000,
+            tags=("天门大开", "万劫圆成", "飞升在即") if track == "phd" else ("双劫尽渡", "天门大开", "飞升在即"),
+            feedback=(
+                "万劫俱尽，天门洞开。此番已非一境小成，而是多年道果归一，可直记飞升大功。"
+                if track == "phd"
+                else "前后双劫至此尽渡，道火归一，天门洞开。此番可作长线修行的飞升大功。"
+            ),
+            confidence=0.96,
+            track=track,
+        )
+    if passed:
+        return _milestone(
+            key="defense_passed",
+            title="雷劫已渡",
+            description="劫云散尽，法身无损，已踏入大乘门槛。",
+            bonus_power=2200,
+            realm_target="大乘期",
+            realm_floor_power=5000,
+            tags=("雷劫已渡", "大乘初成", "天门近启"),
+            feedback="劫雷既散，元神归位。此番关隘已破，法身入大乘之门，余下只待温养圆满。",
+            confidence=0.94,
+            track=track,
+        )
+
+    if _master_stage(track, lower):
+        return _milestone(
+            key="master_defense_started" if track == "master_phd" else "defense_started",
+            title="前劫将临" if track == "master_phd" else "雷劫将临",
+            description="前路劫云已聚，道场将启。" if track == "master_phd" else "劫云已聚，道场将启，境界稳入渡劫门前。",
+            bonus_power=900 if track == "master_phd" else 1200,
+            realm_target="化神期" if track == "master_phd" else "渡劫期",
+            realm_floor_power=1500 if track == "master_phd" else 3000,
+            tags=("前劫将临", "劫云压顶", "道心凝定") if track == "master_phd" else ("雷劫将临", "劫云压顶", "道心凝定"),
+            feedback=(
+                "前劫之云已聚，此关一过方可开后一程。宜收束杂念，把道卷与问答皆炼成护身符。"
+                if track == "master_phd"
+                else "雷劫之云已在天穹聚合，道场将开。此事非寻常功课，可直入渡劫之境，宜稳住道心备迎天雷。"
+            ),
+            confidence=0.92,
+            track=track,
+        )
+    if _doctoral_stage(track, lower):
+        return _milestone(
+            key="doctoral_defense_started" if track == "phd" else "final_defense_started",
+            title="终劫将临" if track == "phd" else ("九重雷劫" if track == "direct_phd" else "后劫将临"),
+            description="终局劫云压顶，道场一开便直面天门。",
+            bonus_power=2000 if track == "direct_phd" else 1800,
+            realm_target="大乘期",
+            realm_floor_power=5000,
+            tags=("终劫将临", "大乘临门", "劫火成海") if track == "phd" else ("后劫将临", "大乘临门", "劫火成海"),
+            feedback="终局劫云已成海，此关一动便牵连多年道果。宜以大乘心境备战，莫把它当作寻常日课。",
+            confidence=0.94,
+            track=track,
+        )
+    return _defense_milestone(DEFAULT_ACADEMIC_TRACK, lower, passed=False)
+
+
+def _thesis_milestone(track: str, lower: str) -> dict[str, Any]:
+    if _doctoral_stage(track, lower):
+        return _milestone(
+            key="doctoral_thesis_submitted",
+            title="道藏呈天",
+            description="本命道藏已呈天阙，终劫之期近在眼前。",
+            bonus_power=2200,
+            realm_target="大乘期",
+            realm_floor_power=5000,
+            tags=("道藏呈天", "终劫将近", "大乘临门"),
+            feedback="本命道藏已呈天阙，多年灵纹归作一卷。此为终劫前的大成节点，法身当入大乘门前。",
+            confidence=0.92,
+            track=track,
+        )
+    return _milestone(
+        key="thesis_submitted",
+        title="渡劫书成",
+        description="本命道卷已呈宗门，天雷之期近在眼前。",
+        bonus_power=1400,
+        realm_target="渡劫期",
+        realm_floor_power=3000,
+        tags=("渡劫书成", "宗门验卷", "劫期将至"),
+        feedback="本命道卷已呈宗门，千日灵纹汇作一章。此为渡劫前的大成节点，气海当有骤涨之象。",
+        confidence=0.91,
+        track=track,
+    )
+
+
+def _paper_milestone(track: str, accepted: bool) -> dict[str, Any]:
+    if accepted and _doctoral_stage(track):
+        return _milestone(
+            key="paper_accepted",
+            title="仙门赐符",
+            description="金榜有名，道法已能撼动一重劫云。",
+            bonus_power=1800,
+            realm_target="渡劫期",
+            realm_floor_power=3000,
+            tags=("仙门赐符", "道名远播", "劫云已动"),
+            feedback="仙门赐符，金榜留名。此番道法已得外界印证，足以牵动劫云，按长线大功记入。",
+            confidence=0.91,
+            track=track,
+        )
+    if accepted:
+        return _milestone(
+            key="paper_accepted",
+            title="仙门赐符",
+            description="外门金榜有名，道法已得仙门印证。",
+            bonus_power=1200,
+            realm_target="化神期",
+            realm_floor_power=1500,
+            tags=("仙门赐符", "金榜有名", "道法印证"),
+            feedback="仙门赐符，金榜留名。此番道法已得外界印证，神识暴涨，足以稳住化神门庭。",
+            confidence=0.9,
+            track=track,
+        )
+    if _doctoral_stage(track):
+        return _milestone(
+            key="paper_submitted",
+            title="叩问上宗",
+            description="道卷已出山门，向更高天阙递上灵符。",
+            bonus_power=1000,
+            realm_target="化神期",
+            realm_floor_power=1500,
+            tags=("叩问上宗", "道卷出山", "神识外放"),
+            feedback="道卷已出山，叩问上宗。此举未定成败，却已是长线修行的重要外证，足以稳住化神门庭。",
+            confidence=0.87,
+            track=track,
+        )
+    return _milestone(
+        key="paper_submitted",
+        title="叩问仙门",
+        description="道卷已出洞府，向山门递上第一道符。",
+        bonus_power=620,
+        realm_target="元婴期",
+        realm_floor_power=800,
+        tags=("叩问仙门", "道卷出山", "灵符已递"),
+        feedback="道卷已离洞府，叩问仙门。此举虽未定成败，却已跨过闭门独修之关，元婴灵机可由此凝实。",
+        confidence=0.86,
+        track=track,
+    )
+
+
+def _proposal_milestone(track: str, lower: str, passed: bool) -> dict[str, Any]:
+    if passed and _doctoral_stage(track, lower):
+        return _milestone(
+            key="doctoral_proposal_passed",
+            title="立宗开山",
+            description="长线道脉已定，元婴之相由此凝实。",
+            bonus_power=620,
+            realm_target="元婴期",
+            realm_floor_power=800,
+            tags=("立宗开山", "元婴有相", "道脉已定"),
+            feedback="长线道脉已定，命灯高悬。此关一过，不再只是筑基小成，而是可凝元婴的开山大誓。",
+            confidence=0.88,
+            track=track,
+        )
+    if passed:
+        return _milestone(
+            key="proposal_passed",
+            title="筑坛立誓",
+            description="道途初定，命灯已悬，金丹之基由此成形。",
+            bonus_power=260,
+            realm_target="金丹期",
+            realm_floor_power=300,
+            tags=("筑坛立誓", "金丹有影", "道途初定"),
+            feedback="命灯已悬，道途初定。此关一过，散乱灵机开始结丹，往后可循此脉络稳步炼化。",
+            confidence=0.86,
+            track=track,
+        )
+    if _doctoral_stage(track, lower):
+        return _milestone(
+            key="doctoral_proposal_started",
+            title="开山择脉",
+            description="长线道脉初显，金丹之基开始沉入气海。",
+            bonus_power=260,
+            realm_target="金丹期",
+            realm_floor_power=300,
+            tags=("开山择脉", "长阶初启", "金丹有影"),
+            feedback="长阶已启，道脉初显。此非短程小誓，宜尽早把一线灵机炼成可久修的本命法门。",
+            confidence=0.82,
+            track=track,
+        )
+    return _milestone(
+        key="proposal_started",
+        title="立道基",
+        description="初开山门，择定一条可长期温养的道脉。",
+        bonus_power=120,
+        realm_target="筑基期",
+        realm_floor_power=100,
+        tags=("立道基", "择脉开山", "根骨渐稳"),
+        feedback="山门初开，道脉已有雏形。此非一日小功，而是筑基之始，宜把灵机收束成可久修之法。",
+        confidence=0.8,
+        track=track,
+    )
+
+
+def _midterm_milestone(track: str, passed: bool) -> dict[str, Any]:
+    if _doctoral_stage(track):
+        return _milestone(
+            key="doctoral_midterm_passed" if passed else "doctoral_midterm_started",
+            title="关门大考" if passed else "关门试炼",
+            description="内门关隘已破，劫云开始显形。" if passed else "内门关隘当前，神识须再凝练。",
+            bonus_power=1600 if passed else 900,
+            realm_target="渡劫期" if passed else "化神期",
+            realm_floor_power=3000 if passed else 1500,
+            tags=("关门大考", "劫云初现", "神识大涨") if passed else ("关门试炼", "神识凝练", "化神临门"),
+            feedback=(
+                "关门大考已破，神识大涨，劫云初现。此为长线道途的中段大关，足可直入渡劫门前。"
+                if passed
+                else "关门试炼已临，神识须再凝练。此关非寻常温课，可按化神门槛的大节点记入。"
+            ),
+            confidence=0.88,
+            track=track,
+        )
+    return _milestone(
+        key="midterm_passed" if passed else "midterm_started",
+        title="中关已破" if passed else "中关将临",
+        description="中段关隘已稳，元婴气象渐成。" if passed else "中段关隘当前，金丹须再温养。",
+        bonus_power=520 if passed else 260,
+        realm_target="元婴期" if passed else "金丹期",
+        realm_floor_power=800 if passed else 300,
+        tags=("中关已破", "元婴渐成", "气脉稳固") if passed else ("中关将临", "金丹温养", "道心凝定"),
+        feedback="中段关隘有应，气脉比寻常日课更重。宜把此关所得归入道卷，免得灵机散去。",
+        confidence=0.84,
+        track=track,
+    )
+
+
+def _finalized_milestone(track: str) -> dict[str, Any]:
+    if _doctoral_stage(track):
+        return _milestone(
+            key="manuscript_finalized",
+            title="道藏定形",
+            description="万千灵纹归于一藏，化神之相更加稳固。",
+            bonus_power=1000,
+            realm_target="化神期",
+            realm_floor_power=1500,
+            tags=("道藏定形", "灵纹归藏", "化神渐稳"),
+            feedback="道藏定形，万千灵纹归于一册。此前零散火候今日并作一炉，神识自然大涨。",
+            confidence=0.85,
+            track=track,
+        )
+    return _milestone(
+        key="manuscript_finalized",
+        title="道卷定形",
+        description="散乱灵纹归于一册，元婴之相更加稳固。",
+        bonus_power=700,
+        realm_target="元婴期",
+        realm_floor_power=800,
+        tags=("道卷定形", "灵纹归册", "元婴渐稳"),
+        feedback="道卷定形，灵纹归册。此前零散火候今日并作一炉，气脉自然比寻常书写更为充沛。",
+        confidence=0.84,
+        track=track,
+    )
 
 
 def apply_milestone_delta(base_delta: float, milestone: dict[str, Any] | None) -> float:
@@ -589,7 +852,9 @@ def _milestone(
     tags: tuple[str, ...],
     feedback: str,
     confidence: float,
+    track: str = DEFAULT_ACADEMIC_TRACK,
 ) -> dict[str, Any]:
+    track = normalize_academic_track(track)
     payload: dict[str, Any] = {
         "key": key,
         "title": title,
@@ -599,6 +864,8 @@ def _milestone(
         "feedback": feedback,
         "achievement_score": 100,
         "confidence": confidence,
+        "track": track,
+        "track_label": academic_track_label(track),
     }
     if realm_target:
         payload["realm_target"] = realm_target
@@ -780,6 +1047,8 @@ def analysis_metadata(analysis: ActivityAnalysis, note: str) -> dict:
         "achievement_score": analysis.achievement_score,
         "confidence": analysis.confidence,
         "tags": list(analysis.tags),
+        "track": analysis.track,
+        "track_label": analysis.track_label,
         "analysis_source": analysis.source,
     }
     if analysis.milestone:
