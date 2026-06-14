@@ -329,6 +329,39 @@ button:disabled {
   line-height: 1.55;
 }
 
+.milestone-banner {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  color: #fff8df;
+  background:
+    linear-gradient(135deg, rgba(19, 38, 30, 0.96), rgba(102, 61, 24, 0.92)),
+    linear-gradient(90deg, rgba(215, 173, 75, 0.22), rgba(63, 102, 128, 0.2));
+  border: 1px solid rgba(215, 173, 75, 0.6);
+  border-radius: 7px;
+}
+
+.milestone-banner div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.milestone-banner span,
+.milestone-banner small {
+  color: rgba(255, 248, 223, 0.72);
+  font-size: 0.78rem;
+}
+
+.milestone-banner strong {
+  font-size: 1.18rem;
+}
+
+.milestone-banner p {
+  color: rgba(255, 248, 223, 0.9);
+}
+
 .tag-row {
   display: flex;
   flex-wrap: wrap;
@@ -433,6 +466,10 @@ button:disabled {
   border-bottom: 1px solid var(--line);
 }
 
+.log-row.has-milestone {
+  padding: 10px 0 13px;
+}
+
 .log-row:last-child {
   border-bottom: 0;
   padding-bottom: 0;
@@ -456,6 +493,18 @@ button:disabled {
 .log-main strong {
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.log-milestone {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 2px 7px;
+  color: #5a3516;
+  background: #f3ddb0;
+  border: 1px solid #d7ad4b;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  vertical-align: middle;
 }
 
 .log-main span {

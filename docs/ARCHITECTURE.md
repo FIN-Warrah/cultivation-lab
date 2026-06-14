@@ -29,6 +29,7 @@ Implemented now:
 - Event ingestion API
 - Natural-language activity analysis API
 - Optional OpenAI Responses API provider with local fallback
+- Milestone detection for insight and breakthrough events
 - Browser text and voice note capture
 - Weight-based cultivation score
 - Time decay from event timestamps
@@ -69,8 +70,13 @@ Natural-language entries are converted into the same contract. The analyzer stor
 {
   "quality": 1.34,
   "note": "跑了两个小时 baseline，定位了 loss 问题",
-  "ai_feedback": "实验突破这一段很顶...",
+  "ai_feedback": "一线灵光贯穿泥丸宫...",
   "achievement_score": 80,
-  "analysis_source": "local_ai or openai:<model>"
+  "analysis_source": "local_ai or openai:<model>",
+  "bonus_power": 1200,
+  "realm_target": "渡劫期",
+  "realm_floor_power": 3000
 }
 ```
+
+Milestone metadata is optional. When present, `bonus_power` is added to the ordinary weighted score, and `realm_floor_power` can lift the replayed state directly to a realm threshold.

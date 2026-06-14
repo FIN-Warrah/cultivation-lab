@@ -35,7 +35,49 @@ class CultivationEngineTest(unittest.TestCase):
         self.assertEqual(realm(99), "炼气期")
         self.assertEqual(realm(100), "筑基期")
         self.assertEqual(realm(800), "元婴期")
-        self.assertEqual(realm(5000), "飞升期")
+        self.assertEqual(realm(5000), "大乘期")
+        self.assertEqual(realm(8000), "飞升期")
+
+    def test_milestone_bonus_and_realm_floor(self) -> None:
+        event = Event.from_payload(
+            {
+                "type": "writing",
+                "duration": 1800,
+                "timestamp": self.now,
+                "metadata": {
+                    "quality": 1.0,
+                    "bonus_power": 1200,
+                    "realm_floor_power": 3000,
+                },
+            }
+        )
+
+        snapshot = self.engine.snapshot([event], now=self.now)
+        report = self.engine.daily_report([event], now=self.now)
+
+        self.assertEqual(snapshot.cultivation_power, 3000)
+        self.assertEqual(snapshot.realm, "渡劫期")
+        self.assertEqual(snapshot.daily_delta, 3000)
+        self.assertEqual(report["total_delta"], 3000)
+
+    def test_realm_floor_survives_final_decay(self) -> None:
+        engine = CultivationEngine(decay_rate_per_day=0.03)
+        event = Event.from_payload(
+            {
+                "type": "writing",
+                "duration": 1800,
+                "timestamp": self.now - 3600,
+                "metadata": {
+                    "bonus_power": 1200,
+                    "realm_floor_power": 3000,
+                },
+            }
+        )
+
+        snapshot = engine.snapshot([event], now=self.now)
+
+        self.assertEqual(snapshot.cultivation_power, 3000)
+        self.assertEqual(snapshot.realm, "渡劫期")
 
     def test_snapshot_and_daily_report(self) -> None:
         events = [

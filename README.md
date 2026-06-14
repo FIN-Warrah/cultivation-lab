@@ -102,6 +102,8 @@ P_t = decayed(previous_power) + score(event)
 ```
 
 `quality` defaults to `1.0` and can be passed via `metadata.quality`, clamped to `0..2`.
+Important nodes can also carry `metadata.bonus_power` and `metadata.realm_floor_power`.
+The note analyzer uses this for breakthrough-style moments such as 有所感、顿悟、投稿、仙门赐符、雷劫将临 and 雷劫已渡.
 
 The dashboard uses the note-based endpoint by default. The browser voice button uses the built-in Web Speech API when available, converts speech to text locally in the browser, then sends the text to `/event/from-note`.
 
@@ -113,7 +115,8 @@ Realm thresholds:
 - `800..1499`: 元婴期
 - `1500..2999`: 化神期
 - `3000..4999`: 渡劫期
-- `>= 5000`: 飞升期
+- `5000..7999`: 大乘期
+- `>= 8000`: 飞升期
 
 ## Tests
 

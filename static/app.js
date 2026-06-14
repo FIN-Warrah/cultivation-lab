@@ -139,13 +139,17 @@ function renderLog(log) {
   for (const item of log) {
     const metadata = item.metadata || {};
     const feedback = metadata.ai_feedback || metadata.note || minutesText(item.duration);
-    const detail = metadata.note && metadata.ai_feedback ? metadata.note : minutesText(item.duration);
+    const milestone = metadata.milestone || null;
+    const detail = milestone?.description || (metadata.tags || []).slice(0, 3).join(" · ") || minutesText(item.duration);
+    const milestoneHtml = milestone
+      ? `<b class="log-milestone">${escapeHtml(milestone.title || metadata.milestone_title || "天机显化")}</b>`
+      : "";
     const row = document.createElement("div");
-    row.className = "log-row";
+    row.className = `log-row ${milestone ? "has-milestone" : ""}`;
     row.innerHTML = `
       <time>${item.time}</time>
       <div class="log-main">
-        <strong>${escapeHtml(labels[item.type] || item.type)}</strong>
+        <strong>${escapeHtml(labels[item.type] || item.type)}${milestoneHtml}</strong>
         <span>${escapeHtml(feedback)}</span>
         <small>${escapeHtml(detail)}</small>
       </div>
@@ -166,6 +170,22 @@ function renderAnalysis(analysis, delta) {
   const source = analysis.source === "local_ai" ? "本地灵签" : "天机判词";
   const tagList = (analysis.tags || []).map((tag) => `<span>${escapeHtml(tag)}</span>`).join("");
   const resultDelta = Number(delta ?? analysis.estimated_delta);
+  const milestone = analysis.milestone || null;
+  const milestoneBlock = milestone
+    ? `
+      <div class="milestone-banner">
+        <div>
+          <span>天机显化</span>
+          <strong>${escapeHtml(milestone.title || "有所感")}</strong>
+        </div>
+        <p>${escapeHtml(milestone.description || milestone.feedback || "")}</p>
+        <small>
+          ${milestone.realm_target ? `直指 ${escapeHtml(milestone.realm_target)} · ` : ""}
+          额外灵力 ${signed(milestone.bonus_power || 0)}
+        </small>
+      </div>
+    `
+    : "";
   target.className = "analysis-result";
   target.innerHTML = `
     <div class="analysis-score">
@@ -178,6 +198,7 @@ function renderAnalysis(analysis, delta) {
       <span>灵验 ${Math.round(analysis.confidence * 100)}%</span>
       <span>${escapeHtml(source)}</span>
     </div>
+    ${milestoneBlock}
     <p>${escapeHtml(analysis.feedback)}</p>
     <div class="tag-row">${tagList}</div>
   `;

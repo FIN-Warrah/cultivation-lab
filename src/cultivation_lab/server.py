@@ -91,8 +91,9 @@ class CultivationRequestHandler(BaseHTTPRequestHandler):
         params = parse_qs(query)
         limit = _parse_int(params.get("limit", ["100"])[0], default=100)
         events = self.store.load_events()
+        deltas = self.engine.deltas_by_id(events)
         events.sort(key=lambda event: event.timestamp, reverse=True)
-        payload = [event.to_dict() | {"delta": round(self.engine.event_delta(event), 2)} for event in events[:limit]]
+        payload = [event.to_dict() | {"delta": round(deltas.get(event.id, self.engine.event_delta(event)), 2)} for event in events[:limit]]
         self._json({"events": payload, "count": len(events)})
 
     def _handle_daily_report(self, query: str) -> None:
@@ -124,9 +125,13 @@ class CultivationRequestHandler(BaseHTTPRequestHandler):
 
         self.store.append_events(events)
         all_events = self.store.load_events()
+        deltas = self.engine.deltas_by_id(all_events)
         self._json(
             {
-                "accepted": [event.to_dict() | {"delta": round(self.engine.event_delta(event), 2)} for event in events],
+                "accepted": [
+                    event.to_dict() | {"delta": round(deltas.get(event.id, self.engine.event_delta(event)), 2)}
+                    for event in events
+                ],
                 "state": self.engine.snapshot(all_events).to_dict(),
             },
             status=HTTPStatus.CREATED,
@@ -160,19 +165,21 @@ class CultivationRequestHandler(BaseHTTPRequestHandler):
             return self._json({"error": "Request body must be valid JSON."}, status=HTTPStatus.BAD_REQUEST)
 
         if not persist:
+            deltas = self.engine.deltas_by_id([event])
             return self._json(
                 {
                     "analysis": analysis.to_dict(),
-                    "event": event.to_dict() | {"delta": round(self.engine.event_delta(event), 2)},
+                    "event": event.to_dict() | {"delta": round(deltas.get(event.id, self.engine.event_delta(event)), 2)},
                 }
             )
 
         self.store.append_event(event)
         all_events = self.store.load_events()
+        deltas = self.engine.deltas_by_id(all_events)
         self._json(
             {
                 "analysis": analysis.to_dict(),
-                "accepted": event.to_dict() | {"delta": round(self.engine.event_delta(event), 2)},
+                "accepted": event.to_dict() | {"delta": round(deltas.get(event.id, self.engine.event_delta(event)), 2)},
                 "state": self.engine.snapshot(all_events).to_dict(),
             },
             status=HTTPStatus.CREATED,

@@ -34,21 +34,15 @@ class CultivationEngine:
 
     def snapshot(self, events: Iterable[Event], now: int | None = None) -> CultivationState:
         now = now or utc_now_ts()
-        ordered = sorted(events, key=lambda event: event.timestamp)
-        power = 0.0
-        last_ts: int | None = None
-
-        for event in ordered:
-            if last_ts is not None:
-                power = self.apply_decay(power, event.timestamp - last_ts)
-            power += self.event_delta(event)
-            last_ts = event.timestamp
+        ordered, contributions, power, last_ts = self.replay(events)
 
         if last_ts is not None:
             power = self.apply_decay(power, now - last_ts)
+        if ordered:
+            power = max(power, max(self.realm_floor_power(event) for event in ordered))
 
         progress = realm_progress(power)
-        daily_delta = self.daily_delta(ordered, now=now)
+        daily_delta = self.daily_delta_from_contributions(contributions, now=now)
         risk, warnings = self.heart_demon_risk(ordered, now=now)
 
         return CultivationState(
@@ -65,7 +59,39 @@ class CultivationEngine:
     def event_delta(self, event: Event) -> float:
         hours = event.duration / SECONDS_PER_HOUR
         weight = self.weights.get(event.type, 0.0)
-        return weight * hours * self.estimate_quality(event)
+        return weight * hours * self.estimate_quality(event) + self.event_bonus(event)
+
+    def event_bonus(self, event: Event) -> float:
+        return _numeric_metadata(event, "bonus_power")
+
+    def realm_floor_power(self, event: Event) -> float:
+        return max(0.0, _numeric_metadata(event, "realm_floor_power"))
+
+    def apply_event(self, power: float, event: Event) -> float:
+        after = power + self.event_delta(event)
+        floor = self.realm_floor_power(event)
+        if floor:
+            after = max(after, floor)
+        return after
+
+    def replay(self, events: Iterable[Event]) -> tuple[list[Event], list[tuple[Event, float]], float, int | None]:
+        ordered = sorted(events, key=lambda event: event.timestamp)
+        power = 0.0
+        last_ts: int | None = None
+        contributions: list[tuple[Event, float]] = []
+
+        for event in ordered:
+            if last_ts is not None:
+                power = self.apply_decay(power, event.timestamp - last_ts)
+            before = power
+            power = self.apply_event(power, event)
+            contributions.append((event, power - before))
+            last_ts = event.timestamp
+
+        return ordered, contributions, power, last_ts
+
+    def deltas_by_id(self, events: Iterable[Event]) -> dict[str, float]:
+        return {event.id: delta for event, delta in self.replay(events)[1]}
 
     def estimate_quality(self, event: Event) -> float:
         raw_quality = event.metadata.get("quality", 1.0)
@@ -82,13 +108,22 @@ class CultivationEngine:
         return power * exp(-self.decay_rate_per_day * delta_days)
 
     def daily_delta(self, events: Iterable[Event], now: int | None = None) -> float:
+        return self.daily_delta_from_contributions(self.replay(events)[1], now=now)
+
+    def daily_delta_from_contributions(
+        self,
+        contributions: Iterable[tuple[Event, float]],
+        now: int | None = None,
+    ) -> float:
         day = local_date(now or utc_now_ts())
-        return sum(self.event_delta(event) for event in events if local_date(event.timestamp) == day)
+        return sum(delta for event, delta in contributions if local_date(event.timestamp) == day)
 
     def daily_report(self, events: Iterable[Event], day: date | None = None, now: int | None = None) -> dict:
         now = now or utc_now_ts()
         report_day = day or local_date(now)
-        selected = [event for event in events if local_date(event.timestamp) == report_day]
+        all_events = list(events)
+        deltas = self.deltas_by_id(all_events)
+        selected = [event for event in all_events if local_date(event.timestamp) == report_day]
         selected.sort(key=lambda event: event.timestamp)
 
         by_type: dict[str, dict[str, float | int | str]] = defaultdict(
@@ -97,7 +132,7 @@ class CultivationEngine:
         log = []
 
         for event in selected:
-            delta = self.event_delta(event)
+            delta = deltas.get(event.id, self.event_delta(event))
             bucket = by_type[event.type]
             bucket["type"] = event.type
             bucket["label"] = EVENT_LABELS.get(event.type, event.type)

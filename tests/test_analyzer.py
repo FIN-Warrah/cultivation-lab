@@ -40,6 +40,41 @@ class ActivityAnalyzerTest(unittest.TestCase):
         self.assertGreater(result.confidence, 0.5)
         self.assertIn("玉简开悟", result.tags)
 
+    def test_defense_preparation_triggers_tribulation(self) -> None:
+        analyzer = ActivityAnalyzer(use_remote=False)
+
+        result = analyzer.analyze("writing", "开始筹备毕业答辩，整理答辩稿和问答材料")
+
+        self.assertIsNotNone(result.milestone)
+        self.assertEqual(result.milestone["title"], "雷劫将临")
+        self.assertEqual(result.milestone["realm_target"], "渡劫期")
+        self.assertEqual(result.milestone["realm_floor_power"], 3000)
+        self.assertGreaterEqual(result.estimated_delta, 3000)
+        self.assertIn("雷劫将临", result.tags)
+        self.assertIn("雷劫", result.feedback)
+
+    def test_passed_defense_triggers_great_vehicle(self) -> None:
+        analyzer = ActivityAnalyzer(use_remote=False)
+
+        result = analyzer.analyze("meeting", "今天毕业答辩顺利通过")
+
+        self.assertIsNotNone(result.milestone)
+        self.assertEqual(result.milestone["title"], "雷劫已渡")
+        self.assertEqual(result.milestone["realm_target"], "大乘期")
+        self.assertEqual(result.milestone["realm_floor_power"], 5000)
+        self.assertGreaterEqual(result.estimated_delta, 5000)
+        self.assertIn("大乘初成", result.tags)
+
+    def test_breakthrough_gets_insight_bonus(self) -> None:
+        analyzer = ActivityAnalyzer(use_remote=False)
+
+        result = analyzer.analyze("debugging", "卡了很久的关键问题今天终于想通并突破")
+
+        self.assertIsNotNone(result.milestone)
+        self.assertEqual(result.milestone["title"], "有所悟")
+        self.assertGreaterEqual(result.milestone["bonus_power"], 420)
+        self.assertIn("有所悟", result.tags)
+
 
 if __name__ == "__main__":
     unittest.main()

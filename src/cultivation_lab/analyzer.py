@@ -120,6 +120,7 @@ class ActivityAnalysis:
     confidence: float
     tags: tuple[str, ...]
     feedback: str
+    milestone: dict[str, Any] | None = None
     source: str = "local_ai"
 
     def to_dict(self) -> dict:
@@ -133,6 +134,7 @@ class ActivityAnalysis:
             "confidence": self.confidence,
             "tags": list(self.tags),
             "feedback": self.feedback,
+            "milestone": self.milestone,
             "source": self.source,
         }
 
@@ -160,18 +162,26 @@ class LocalActivityAnalyzer:
         duration_minutes, duration_confidence = infer_duration_minutes(clean_note, event_type)
         quality, tags = infer_quality(clean_note, event_type)
         weight = WEIGHTS.get(event_type, 0.0)
-        estimated_delta = round(weight * (duration_minutes / 60.0) * quality, 2)
+        base_delta = round(weight * (duration_minutes / 60.0) * quality, 2)
+        milestone = detect_milestone(clean_note, event_type)
+        estimated_delta = apply_milestone_delta(base_delta, milestone)
         cultivation_tags = xianxia_tags(tags, event_type, estimated_delta)
+        if milestone:
+            cultivation_tags = _dedupe(list(milestone.get("tags", [])) + cultivation_tags)[:5]
         achievement_score = round(max(-100, min(100, estimated_delta * 4)))
         confidence = round(min(0.96, 0.48 + duration_confidence + min(0.24, len(clean_note) / 180)), 2)
-        feedback = relaxed_feedback(
-            event_type=event_type,
-            duration_minutes=duration_minutes,
-            quality=quality,
-            estimated_delta=estimated_delta,
-            tags=cultivation_tags,
-            note=clean_note,
-        )
+        if milestone:
+            feedback = str(milestone["feedback"])
+            confidence = max(confidence, float(milestone.get("confidence", 0.88)))
+        else:
+            feedback = relaxed_feedback(
+                event_type=event_type,
+                duration_minutes=duration_minutes,
+                quality=quality,
+                estimated_delta=estimated_delta,
+                tags=cultivation_tags,
+                note=clean_note,
+            )
 
         return ActivityAnalysis(
             event_type=event_type,
@@ -183,6 +193,7 @@ class LocalActivityAnalyzer:
             confidence=confidence,
             tags=tuple(cultivation_tags),
             feedback=feedback,
+            milestone=milestone,
         )
 
 
@@ -294,11 +305,27 @@ class OpenAIActivityAnalyzer:
         quality = _clamp_float(parsed.get("quality"), 0.25, 1.85, 1.0)
         if event_type in {"browsing", "idle"}:
             quality = min(quality, 1.0)
-        estimated_delta = round(WEIGHTS.get(event_type, 0.0) * (duration_minutes / 60.0) * quality, 2)
+        base_delta = round(WEIGHTS.get(event_type, 0.0) * (duration_minutes / 60.0) * quality, 2)
+        milestone = detect_milestone(note, event_type)
+        estimated_delta = apply_milestone_delta(base_delta, milestone)
         tags = xianxia_tags(_normalize_tags(parsed.get("tags")), event_type, estimated_delta)
+        if milestone:
+            tags = _dedupe(list(milestone.get("tags", [])) + tags)[:5]
         feedback = str(parsed.get("feedback") or "").strip()
+        if milestone:
+            feedback = str(milestone["feedback"])
         if not feedback:
             feedback = relaxed_feedback(event_type, duration_minutes, quality, estimated_delta, tags, note)
+        achievement_score = _clamp_int(
+            parsed.get("achievement_score"),
+            -100,
+            100,
+            round(max(-100, min(100, estimated_delta * 4))),
+        )
+        confidence = round(_clamp_float(parsed.get("confidence"), 0.0, 1.0, 0.72), 2)
+        if milestone:
+            achievement_score = max(achievement_score, int(milestone.get("achievement_score", 100)))
+            confidence = max(confidence, float(milestone.get("confidence", 0.9)))
 
         return ActivityAnalysis(
             event_type=event_type,
@@ -306,15 +333,11 @@ class OpenAIActivityAnalyzer:
             duration_minutes=duration_minutes,
             quality=round(quality, 2),
             estimated_delta=estimated_delta,
-            achievement_score=_clamp_int(
-                parsed.get("achievement_score"),
-                -100,
-                100,
-                round(max(-100, min(100, estimated_delta * 4))),
-            ),
-            confidence=round(_clamp_float(parsed.get("confidence"), 0.0, 1.0, 0.72), 2),
+            achievement_score=achievement_score,
+            confidence=round(confidence, 2),
             tags=tuple(tags),
             feedback=feedback,
+            milestone=milestone,
             source=f"openai:{self.model}",
         )
 
@@ -372,6 +395,220 @@ def infer_quality(note: str, event_type: str) -> tuple[float, list[str]]:
 
     quality = round(max(0.25, min(1.85, quality)), 2)
     return quality, _dedupe(tags)[:4]
+
+
+def detect_milestone(note: str, event_type: str) -> dict[str, Any] | None:
+    clean = " ".join((note or "").strip().split())
+    lower = clean.lower()
+    if not clean:
+        return None
+
+    has_defense = _has_any(lower, ("答辩", "defense", "viva"))
+    defense_passed = (
+        has_defense
+        and (
+            _has_any(lower, ("通过", "过了", "passed"))
+            or re.search(r"(答辩|defense|viva).{0,8}(完成|结束|顺利)", lower) is not None
+        )
+    )
+    if defense_passed:
+        return _milestone(
+            key="defense_passed",
+            title="雷劫已渡",
+            description="劫云散尽，法身无损，已踏入大乘门槛。",
+            bonus_power=2200,
+            realm_target="大乘期",
+            realm_floor_power=5000,
+            tags=("雷劫已渡", "大乘初成", "天门近启"),
+            feedback="劫雷既散，元神归位。此番关隘已破，法身入大乘之门，余下只待温养圆满。",
+            confidence=0.94,
+        )
+    if has_defense:
+        return _milestone(
+            key="defense_started",
+            title="雷劫将临",
+            description="劫云已聚，道场将启，境界稳入渡劫门前。",
+            bonus_power=1200,
+            realm_target="渡劫期",
+            realm_floor_power=3000,
+            tags=("雷劫将临", "劫云压顶", "道心凝定"),
+            feedback="雷劫之云已在天穹聚合，道场将开。此事非寻常功课，可直入渡劫之境，宜稳住道心备迎天雷。",
+            confidence=0.92,
+        )
+
+    thesis_terms = (
+        "提交学位论文",
+        "毕业论文提交",
+        "提交毕业论文",
+        "学位论文提交",
+        "thesis submitted",
+        "dissertation submitted",
+    )
+    if _has_any(lower, thesis_terms):
+        return _milestone(
+            key="thesis_submitted",
+            title="渡劫书成",
+            description="本命道卷已呈宗门，天雷之期近在眼前。",
+            bonus_power=1400,
+            realm_target="渡劫期",
+            realm_floor_power=3000,
+            tags=("渡劫书成", "宗门验卷", "劫期将至"),
+            feedback="本命道卷已呈宗门，千日灵纹汇作一章。此为渡劫前的大成节点，气海当有骤涨之象。",
+            confidence=0.91,
+        )
+
+    paper_terms = ("论文", "paper", "稿件", "投稿", "会议", "期刊", "journal", "conference", "manuscript")
+    accepted_terms = ("录用", "接收", "中稿", "命中", "accept", "accepted")
+    if _has_any(lower, accepted_terms) and _has_any(lower, paper_terms):
+        return _milestone(
+            key="paper_accepted",
+            title="仙门赐符",
+            description="外门金榜有名，道法已得仙门印证。",
+            bonus_power=1200,
+            realm_target="化神期",
+            realm_floor_power=1500,
+            tags=("仙门赐符", "金榜有名", "道法印证"),
+            feedback="仙门赐符，金榜留名。此番道法已得外界印证，神识暴涨，足以稳住化神门庭。",
+            confidence=0.9,
+        )
+
+    submit_terms = ("投稿", "提交", "submit", "submitted", "arxiv", "openreview", "投出去")
+    if _has_any(lower, submit_terms) and _has_any(lower, paper_terms):
+        return _milestone(
+            key="paper_submitted",
+            title="叩问仙门",
+            description="道卷已出洞府，向山门递上第一道符。",
+            bonus_power=620,
+            realm_target="元婴期",
+            realm_floor_power=800,
+            tags=("叩问仙门", "道卷出山", "灵符已递"),
+            feedback="道卷已离洞府，叩问仙门。此举虽未定成败，却已跨过闭门独修之关，元婴灵机可由此凝实。",
+            confidence=0.86,
+        )
+
+    proposal_passed = "开题" in clean and _has_any(lower, ("通过", "过了", "完成", "passed"))
+    if proposal_passed:
+        return _milestone(
+            key="proposal_passed",
+            title="筑坛立誓",
+            description="道途初定，命灯已悬，金丹之基由此成形。",
+            bonus_power=260,
+            realm_target="金丹期",
+            realm_floor_power=300,
+            tags=("筑坛立誓", "金丹有影", "道途初定"),
+            feedback="命灯已悬，道途初定。此关一过，散乱灵机开始结丹，往后可循此脉络稳步炼化。",
+            confidence=0.86,
+        )
+    if "开题" in clean:
+        return _milestone(
+            key="proposal_started",
+            title="立道基",
+            description="初开山门，择定一条可长期温养的道脉。",
+            bonus_power=120,
+            realm_target="筑基期",
+            realm_floor_power=100,
+            tags=("立道基", "择脉开山", "根骨渐稳"),
+            feedback="山门初开，道脉已有雏形。此非一日小功，而是筑基之始，宜把灵机收束成可久修之法。",
+            confidence=0.8,
+        )
+
+    done_terms = ("定稿", "终稿", "camera-ready", "返修完成", "rebuttal完成", "rebuttal finished")
+    if _has_any(lower, done_terms):
+        return _milestone(
+            key="manuscript_finalized",
+            title="道卷定形",
+            description="散乱灵纹归于一册，元婴之相更加稳固。",
+            bonus_power=700,
+            realm_target="元婴期",
+            realm_floor_power=800,
+            tags=("道卷定形", "灵纹归册", "元婴渐稳"),
+            feedback="道卷定形，灵纹归册。此前零散火候今日并作一炉，气脉自然比寻常书写更为充沛。",
+            confidence=0.84,
+        )
+
+    breakthrough_terms = (
+        "突破",
+        "顿悟",
+        "想通",
+        "解决关键",
+        "关键问题",
+        "瓶颈",
+        "找到原因",
+        "aha",
+        "insight",
+        "breakthrough",
+    )
+    if _has_any(lower, breakthrough_terms):
+        return _milestone(
+            key="breakthrough",
+            title="有所悟",
+            description="一线灵光贯穿关隘，瓶颈已有松动。",
+            bonus_power=420,
+            realm_target=None,
+            realm_floor_power=None,
+            tags=("有所悟", "瓶颈初破", "灵台大明"),
+            feedback="一线灵光贯穿泥丸宫，旧日关隘已有裂纹。此乃真悟，不必拘泥时辰，灵力当按大功记入。",
+            confidence=0.84,
+        )
+
+    insight_terms = ("有所感", "悟到", "明白了", "理解了", "理清", "思路清楚", "有点理解")
+    if _has_any(lower, insight_terms):
+        return _milestone(
+            key="insight",
+            title="有所感",
+            description="心湖微明，已有可继续温养的灵机。",
+            bonus_power=120,
+            realm_target=None,
+            realm_floor_power=None,
+            tags=("有所感", "心湖微明", "灵机可养"),
+            feedback="心湖微明，灵机初现。此类感应虽未成雷霆，却能滋养后续关窍，宜趁热写入玉简。",
+            confidence=0.78,
+        )
+
+    return None
+
+
+def apply_milestone_delta(base_delta: float, milestone: dict[str, Any] | None) -> float:
+    if not milestone:
+        return base_delta
+    total = base_delta + float(milestone.get("bonus_power") or 0)
+    floor = milestone.get("realm_floor_power")
+    if floor is not None:
+        total = max(total, float(floor))
+    return round(total, 2)
+
+
+def _milestone(
+    *,
+    key: str,
+    title: str,
+    description: str,
+    bonus_power: float,
+    realm_target: str | None,
+    realm_floor_power: float | None,
+    tags: tuple[str, ...],
+    feedback: str,
+    confidence: float,
+) -> dict[str, Any]:
+    payload: dict[str, Any] = {
+        "key": key,
+        "title": title,
+        "description": description,
+        "bonus_power": float(bonus_power),
+        "tags": list(tags),
+        "feedback": feedback,
+        "achievement_score": 100,
+        "confidence": confidence,
+    }
+    if realm_target:
+        payload["realm_target"] = realm_target
+    if realm_floor_power is not None:
+        payload["realm_floor_power"] = float(realm_floor_power)
+    return payload
+
+
+def _has_any(text: str, needles: tuple[str, ...]) -> bool:
+    return any(needle.lower() in text for needle in needles)
 
 
 def relaxed_feedback(
@@ -536,7 +773,7 @@ def _env_float(name: str, default: float) -> float:
 
 
 def analysis_metadata(analysis: ActivityAnalysis, note: str) -> dict:
-    return {
+    metadata = {
         "quality": analysis.quality,
         "note": note,
         "ai_feedback": analysis.feedback,
@@ -545,3 +782,14 @@ def analysis_metadata(analysis: ActivityAnalysis, note: str) -> dict:
         "tags": list(analysis.tags),
         "analysis_source": analysis.source,
     }
+    if analysis.milestone:
+        milestone = analysis.milestone
+        metadata["milestone"] = milestone
+        metadata["milestone_key"] = milestone.get("key")
+        metadata["milestone_title"] = milestone.get("title")
+        metadata["bonus_power"] = milestone.get("bonus_power", 0)
+        if milestone.get("realm_target"):
+            metadata["realm_target"] = milestone.get("realm_target")
+        if milestone.get("realm_floor_power") is not None:
+            metadata["realm_floor_power"] = milestone.get("realm_floor_power")
+    return metadata
