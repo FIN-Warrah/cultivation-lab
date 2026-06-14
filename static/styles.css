@@ -95,6 +95,40 @@ h2 {
   color: rgba(255, 248, 223, 0.86);
 }
 
+.track-chip {
+  width: fit-content;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-top: 18px;
+  padding: 8px 9px 8px 12px;
+  color: rgba(255, 248, 223, 0.76);
+  background: rgba(255, 248, 223, 0.1);
+  border: 1px solid rgba(215, 173, 75, 0.42);
+  border-radius: 999px;
+}
+
+.track-chip strong {
+  color: #fff8df;
+}
+
+.track-chip button,
+.ghost-button {
+  min-height: 30px;
+  margin: 0;
+  padding: 4px 9px;
+  color: #13261e;
+  background: #f0ddb0;
+  border: 1px solid rgba(215, 173, 75, 0.62);
+  border-radius: 999px;
+  font-size: 0.8rem;
+}
+
+.track-chip button:hover,
+.ghost-button:hover {
+  background: #f6e6bd;
+}
+
 .power-readout {
   min-width: 210px;
   display: grid;
@@ -180,12 +214,6 @@ h2 {
 .input-card {
   display: grid;
   gap: 14px;
-}
-
-.form-grid {
-  display: grid;
-  grid-template-columns: minmax(0, 0.92fr) minmax(0, 1.08fr);
-  gap: 12px;
 }
 
 label {
@@ -542,6 +570,72 @@ button:disabled {
   color: var(--muted);
 }
 
+.track-dialog {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  background: rgba(6, 15, 10, 0.58);
+}
+
+.track-dialog.is-hidden {
+  display: none;
+}
+
+.track-dialog-panel {
+  width: min(640px, 100%);
+  display: grid;
+  gap: 16px;
+  padding: 22px;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+}
+
+.track-dialog-panel p {
+  color: var(--muted);
+}
+
+.track-choice-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.track-choice-grid button {
+  min-height: 92px;
+  display: grid;
+  align-content: center;
+  gap: 6px;
+  margin: 0;
+  padding: 14px;
+  color: var(--surface-strong);
+  text-align: left;
+  background: #fffdf5;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+}
+
+.track-choice-grid button:hover,
+.track-choice-grid button.is-active {
+  background: #f0e4bd;
+  border-color: var(--gold);
+}
+
+.track-choice-grid strong {
+  font-size: 1rem;
+}
+
+.track-choice-grid span {
+  color: var(--muted);
+  font-size: 0.82rem;
+  line-height: 1.4;
+}
+
 @media (max-width: 760px) {
   .shell {
     width: min(100vw - 20px, 1180px);
@@ -573,8 +667,14 @@ button:disabled {
     grid-template-columns: 1fr;
   }
 
-  .form-grid {
+  .track-choice-grid {
     grid-template-columns: 1fr;
+  }
+
+  .track-chip {
+    max-width: 100%;
+    flex-wrap: wrap;
+    border-radius: 8px;
   }
 
   .log-row {

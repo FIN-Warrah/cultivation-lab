@@ -13,6 +13,11 @@
           <p class="eyebrow">修炼洞天</p>
           <h1 id="realm">炼气期</h1>
           <p id="narrative" class="narrative">正在启盘观照今日灵机。</p>
+          <div class="track-chip" aria-label="本命道途">
+            <span>本命道途</span>
+            <strong id="currentTrackLabel">未择定</strong>
+            <button id="changeTrackButton" type="button">改道途</button>
+          </div>
         </div>
         <div class="power-readout">
           <span class="label">灵力</span>
@@ -37,30 +42,19 @@
             <h2>今日修行录</h2>
             <span id="formStatus"></span>
           </div>
-          <div class="form-grid">
-            <label>
-              本命道途
-              <select id="track" name="track">
-                <option value="master">硕士一程</option>
-                <option value="phd">博士一程</option>
-                <option value="direct_phd">直博玄门</option>
-                <option value="master_phd">硕博连修</option>
-              </select>
-            </label>
-            <label>
-              修行法门
-              <select id="eventType" name="type">
-                <option value="coding">符阵炼器</option>
-                <option value="paper_reading">玉简参悟</option>
-                <option value="experiment_run">丹炉试炼</option>
-                <option value="writing">道卷成章</option>
-                <option value="debugging">破阵除障</option>
-                <option value="meeting">同门论道</option>
-                <option value="browsing">心猿游荡</option>
-                <option value="idle">神游太虚</option>
-              </select>
-            </label>
-          </div>
+          <label>
+            修行法门
+            <select id="eventType" name="type">
+              <option value="coding">符阵炼器</option>
+              <option value="paper_reading">玉简参悟</option>
+              <option value="experiment_run">丹炉试炼</option>
+              <option value="writing">道卷成章</option>
+              <option value="debugging">破阵除障</option>
+              <option value="meeting">同门论道</option>
+              <option value="browsing">心猿游荡</option>
+              <option value="idle">神游太虚</option>
+            </select>
+          </label>
           <div id="promptRow" class="prompt-row" aria-label="快捷示例">
             <button
               type="button"
@@ -147,6 +141,34 @@
         </section>
       </section>
     </main>
+
+    <section id="trackDialog" class="track-dialog is-hidden" role="dialog" aria-modal="true" aria-labelledby="trackDialogTitle">
+      <div class="track-dialog-panel">
+        <div class="card-title">
+          <h2 id="trackDialogTitle">择定本命道途</h2>
+          <button id="closeTrackDialog" class="ghost-button" type="button">暂不改</button>
+        </div>
+        <p>一念既定，诸劫有序。</p>
+        <div class="track-choice-grid">
+          <button type="button" data-track-choice="master">
+            <strong>硕士一程</strong>
+            <span>雷劫已渡，入大乘门。</span>
+          </button>
+          <button type="button" data-track-choice="phd">
+            <strong>博士一程</strong>
+            <span>万劫圆成，天门大开。</span>
+          </button>
+          <button type="button" data-track-choice="direct_phd">
+            <strong>直博玄门</strong>
+            <span>长阶独行，一路飞升。</span>
+          </button>
+          <button type="button" data-track-choice="master_phd">
+            <strong>硕博连修</strong>
+            <span>前后双劫，道火归一。</span>
+          </button>
+        </div>
+      </div>
+    </section>
     <script src="/app.js" defer></script>
   </body>
 </html>

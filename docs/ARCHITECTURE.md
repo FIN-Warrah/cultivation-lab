@@ -83,3 +83,4 @@ Natural-language entries are converted into the same contract. The analyzer stor
 
 Milestone metadata is optional. When present, `bonus_power` is added to the ordinary weighted score, and `realm_floor_power` can lift the replayed state directly to a realm threshold.
 The analyzer accepts four tracks: `master`, `phd`, `direct_phd`, and `master_phd`. Track selection changes the milestone table for proposal, midterm/qualifying, thesis submission, paper submission/acceptance, and defense events.
+The current web dashboard stores the user's default track in browser local storage and sends it with note submissions; API callers may provide `track` per request.

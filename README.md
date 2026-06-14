@@ -107,7 +107,7 @@ The note analyzer uses this for breakthrough-style moments such as 有所感、�
 
 The dashboard uses the note-based endpoint by default. The browser voice button uses the built-in Web Speech API when available, converts speech to text locally in the browser, then sends the text to `/event/from-note`.
 
-Natural-language entries can include an academic track:
+The dashboard asks the user to choose an academic track on first use, stores it in browser local storage, and automatically attaches it to later note submissions. It can be changed from the main dashboard. API clients can still pass `track` explicitly:
 
 - `master`: 硕士一程
 - `phd`: 博士一程

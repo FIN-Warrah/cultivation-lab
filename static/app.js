@@ -19,6 +19,7 @@ const trackLabels = {
 const state = {
   snapshot: null,
   report: null,
+  track: null,
 };
 
 const $ = (selector) => document.querySelector(selector);
@@ -59,6 +60,41 @@ function cultivationTime(minutes) {
     return value % 120 === 0 ? `${shichen} 个时辰` : `约 ${shichen.toFixed(1)} 个时辰`;
   }
   return `约 ${value} 分`;
+}
+
+function validTrack(track) {
+  return Object.prototype.hasOwnProperty.call(trackLabels, track);
+}
+
+function getCurrentTrack() {
+  return validTrack(state.track) ? state.track : null;
+}
+
+function setCurrentTrack(track) {
+  if (!validTrack(track)) return;
+  state.track = track;
+  localStorage.setItem("cultivationTrack", track);
+  renderTrack();
+}
+
+function renderTrack() {
+  const track = getCurrentTrack();
+  $("#currentTrackLabel").textContent = track ? trackLabels[track] : "未择定";
+  for (const button of document.querySelectorAll("[data-track-choice]")) {
+    button.classList.toggle("is-active", button.dataset.trackChoice === track);
+  }
+}
+
+function openTrackDialog(required = false) {
+  const dialog = $("#trackDialog");
+  dialog.classList.remove("is-hidden");
+  dialog.dataset.required = required ? "true" : "false";
+  $("#closeTrackDialog").hidden = required;
+}
+
+function closeTrackDialog() {
+  $("#trackDialog").classList.add("is-hidden");
+  $("#trackDialog").dataset.required = "false";
 }
 
 async function fetchJson(url, options) {
@@ -176,7 +212,7 @@ function renderAnalysis(analysis, delta) {
   }
 
   const source = analysis.source === "local_ai" ? "本地灵签" : "天机判词";
-  const trackName = analysis.track_label || trackLabels[analysis.track] || trackLabels[$("#track").value];
+  const trackName = analysis.track_label || trackLabels[analysis.track] || trackLabels[getCurrentTrack()];
   const tagList = (analysis.tags || []).map((tag) => `<span>${escapeHtml(tag)}</span>`).join("");
   const resultDelta = Number(delta ?? analysis.estimated_delta);
   const milestone = analysis.milestone || null;
@@ -222,6 +258,14 @@ async function submitEvent(event) {
   const formStatus = $("#formStatus");
   formStatus.textContent = "推演中";
 
+  const track = getCurrentTrack();
+  if (!track) {
+    formStatus.textContent = "请先择定本命道途";
+    openTrackDialog(true);
+    submitting = false;
+    return;
+  }
+
   const note = $("#note").value.trim();
   if (!note) {
     formStatus.textContent = "请先呈上修行经过";
@@ -231,7 +275,7 @@ async function submitEvent(event) {
 
   const payload = {
     type: $("#eventType").value,
-    track: $("#track").value,
+    track,
     note,
     timestamp: Math.floor(Date.now() / 1000),
   };
@@ -266,11 +310,26 @@ function applyTemplate(event) {
 const eventForm = $("#eventForm");
 const savedTrack = localStorage.getItem("cultivationTrack");
 if (trackLabels[savedTrack]) {
-  $("#track").value = savedTrack;
+  state.track = savedTrack;
+} else {
+  localStorage.removeItem("cultivationTrack");
 }
-$("#track").addEventListener("change", () => {
-  localStorage.setItem("cultivationTrack", $("#track").value);
+renderTrack();
+$("#changeTrackButton").addEventListener("click", () => openTrackDialog(false));
+$("#closeTrackDialog").addEventListener("click", closeTrackDialog);
+$("#trackDialog").addEventListener("click", (event) => {
+  if (event.target === $("#trackDialog") && $("#trackDialog").dataset.required !== "true") {
+    closeTrackDialog();
+  }
+  const button = event.target.closest("[data-track-choice]");
+  if (!button) return;
+  setCurrentTrack(button.dataset.trackChoice);
+  closeTrackDialog();
+  $("#formStatus").textContent = "";
 });
+if (!getCurrentTrack()) {
+  openTrackDialog(true);
+}
 eventForm.addEventListener("submit", submitEvent);
 eventForm.querySelector('button[type="submit"]').addEventListener("click", submitEvent);
 $("#promptRow").addEventListener("click", applyTemplate);
