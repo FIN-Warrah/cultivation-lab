@@ -165,23 +165,23 @@ class CultivationEngine:
 
         warnings = []
         if browsing_hours > HEART_DEMON_BROWSING_HOURS:
-            warnings.append("心魔预警：近 24 小时无效浏览偏高。")
+            warnings.append("心魔预警：近一日心猿外驰过久，灵息有散。")
         if fragmentation > HEART_DEMON_FRAGMENTATION:
-            warnings.append("心魔预警：行为碎片化偏高，建议安排一段连续深度工作。")
+            warnings.append("心魔预警：修行断续如残符，宜择一段清净时辰闭关。")
         return risk, warnings
 
     def _daily_narrative(self, total_delta: float, risk: float, events: list[Event]) -> str:
         if not events:
-            return "今日尚未记录修炼行为。"
+            return "今日玉简尚空，静候第一缕灵机入账。"
         if risk >= 0.75:
-            return "今日心魔扰动明显，建议先压低浏览和切换频率。"
+            return "今日心魔扰动甚烈，宜先收束神念，莫急于强行破关。"
         if total_delta >= 40:
-            return "今日修炼势头强劲，有明显学术推进。"
+            return "今日灵压大涨，气海翻涌，已有小破境之象。"
         if total_delta >= 15:
-            return "今日修炼稳定，适合在晚间补一段总结或论文笔记。"
+            return "今日道心颇稳，灵力绵长，可再温养一轮巩固道基。"
         if total_delta >= 0:
-            return "今日修为小幅增长，可以用一个低阻力任务收尾。"
-        return "今日修为回落，优先减少无效浏览并恢复连续专注。"
+            return "今日修为小幅增长，可以用一段低阻力功课收尾。"
+        return "今日灵息回落，宜斩杂念、闭心门，待气脉复稳。"
 
 
 def realm(power: float) -> str:

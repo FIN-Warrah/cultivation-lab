@@ -52,6 +52,46 @@ FRICTION_HINTS = {
     "失败": -0.08,
 }
 
+XIANXIA_TAGS = {
+    "完成": "一诀功成",
+    "写完": "道卷落笔",
+    "跑通": "炉火贯通",
+    "复现": "古法重现",
+    "baseline": "炉基已成",
+    "收敛": "灵息归元",
+    "优化": "淬炼精进",
+    "修复": "补全天机",
+    "定位": "窥见阵眼",
+    "总结": "凝练心得",
+    "投稿": "投递仙门",
+    "实验记录": "丹录成册",
+    "读完": "玉简尽览",
+    "笔记": "灵纹留痕",
+    "figure": "灵图显影",
+    "表格": "阵图归位",
+    "ablation": "拆阵验法",
+    "卡住": "关隘未破",
+    "没进展": "灵机未显",
+    "刷": "心猿扰动",
+    "乱看": "杂念入海",
+    "分心": "道心浮动",
+    "拖延": "尘缘牵缠",
+    "失败": "炉火失衡",
+    "描述清楚": "脉络分明",
+    "细节充足": "灵纹充盈",
+}
+
+EVENT_TAGS = {
+    "coding": "符阵成形",
+    "paper_reading": "玉简开悟",
+    "experiment_run": "丹炉有应",
+    "writing": "道卷添章",
+    "debugging": "阵眼已现",
+    "meeting": "同门印证",
+    "browsing": "心猿外驰",
+    "idle": "神游未归",
+}
+
 CHINESE_NUMBERS = {
     "零": 0,
     "一": 1,
@@ -121,6 +161,7 @@ class LocalActivityAnalyzer:
         quality, tags = infer_quality(clean_note, event_type)
         weight = WEIGHTS.get(event_type, 0.0)
         estimated_delta = round(weight * (duration_minutes / 60.0) * quality, 2)
+        cultivation_tags = xianxia_tags(tags, event_type, estimated_delta)
         achievement_score = round(max(-100, min(100, estimated_delta * 4)))
         confidence = round(min(0.96, 0.48 + duration_confidence + min(0.24, len(clean_note) / 180)), 2)
         feedback = relaxed_feedback(
@@ -128,7 +169,7 @@ class LocalActivityAnalyzer:
             duration_minutes=duration_minutes,
             quality=quality,
             estimated_delta=estimated_delta,
-            tags=tags,
+            tags=cultivation_tags,
             note=clean_note,
         )
 
@@ -140,7 +181,7 @@ class LocalActivityAnalyzer:
             estimated_delta=estimated_delta,
             achievement_score=achievement_score,
             confidence=confidence,
-            tags=tuple(tags),
+            tags=tuple(cultivation_tags),
             feedback=feedback,
         )
 
@@ -184,8 +225,10 @@ class OpenAIActivityAnalyzer:
                 {
                     "role": "system",
                     "content": (
-                        "你是 Cultivation Lab 的科研修炼评估器。"
-                        "根据用户对一次科研行为的自然语言描述，估算投入时长、质量、成果标签和修仙风格评语。"
+                        "你是 Cultivation Lab 的修仙判官。"
+                        "根据用户对一次现实修炼行为的自然语言描述，估算投入时长、质量、成果标签和修仙评语。"
+                        "所有可见文案必须完全是修仙语体。"
+                        "feedback 和 tags 禁止出现论文、实验、代码、baseline、loss、debug、科研、读研等现实词。"
                         "只输出 JSON，不要输出 Markdown。"
                     ),
                 },
@@ -198,6 +241,8 @@ class OpenAIActivityAnalyzer:
                         "请返回字段: duration_minutes(int,1-720), quality(number,0.25-1.85), "
                         "achievement_score(int,-100到100), confidence(number,0-1), "
                         "tags(array of short strings,最多5个), feedback(string,中文,修仙风格,不超过90字)。"
+                        "tags 必须像“玉简开悟”“丹炉有应”“道心浮动”这样的修仙词。"
+                        "feedback 要像宗门长老评点弟子修行，不要像导师点评研究生。"
                         "不要让负面类别 browsing/idle 得到正向质量奖励。"
                     ),
                 },
@@ -250,7 +295,7 @@ class OpenAIActivityAnalyzer:
         if event_type in {"browsing", "idle"}:
             quality = min(quality, 1.0)
         estimated_delta = round(WEIGHTS.get(event_type, 0.0) * (duration_minutes / 60.0) * quality, 2)
-        tags = _normalize_tags(parsed.get("tags"))
+        tags = xianxia_tags(_normalize_tags(parsed.get("tags")), event_type, estimated_delta)
         feedback = str(parsed.get("feedback") or "").strip()
         if not feedback:
             feedback = relaxed_feedback(event_type, duration_minutes, quality, estimated_delta, tags, note)
@@ -338,23 +383,36 @@ def relaxed_feedback(
     note: str,
 ) -> str:
     label = EVENT_LABELS.get(event_type, event_type)
-    hours = duration_minutes / 60.0
-    duration_text = f"{duration_minutes} 分钟" if duration_minutes < 90 else f"{hours:.1f} 小时"
-    tag_text = "、".join(tags[:2]) if tags else "稳稳推进"
+    duration_text = cultivation_duration_text(duration_minutes)
+    tag_text = "、".join(tags[:2]) if tags else EVENT_TAGS.get(event_type, "灵机微动")
 
     if event_type in {"browsing", "idle"} or estimated_delta < 0:
-        return f"{label}记下来了，约 {duration_text}。这段更像是心神散了一下，先不苛责，收回来就还能继续涨修为。"
+        return f"{label}约 {duration_text}，心猿离座，灵息外散。速归蒲团，闭目调息，莫让杂念侵蚀道基。"
     if estimated_delta >= 28:
-        return f"{label}这一段很顶，约 {duration_text}，关键词是{tag_text}。今天不是假装努力，是真的往前拱了一截。"
+        return f"{label}约 {duration_text}，{tag_text}，灵台大明。此番火候已至，可记入今日上乘功课。"
     if quality >= 1.35:
-        return f"{label}质量不错，约 {duration_text}。有产出感，不用端着，给自己倒杯水也算合理庆祝。"
+        return f"{label}约 {duration_text}，{tag_text}，气脉运行颇顺。若能趁热温养，破境之机可再添一线。"
     if len(note) < 8:
-        return f"{label}已记录，先按 {duration_text} 估算。下次多说一句成果，AI 就能更准地给你算修为。"
-    return f"{label}稳定入账，约 {duration_text}。节奏不必太燃，今天这点推进已经算数。"
+        return f"{label}约 {duration_text}，玉简所载尚略。此番先记小功一笔，来日当详述灵机所得。"
+    return f"{label}约 {duration_text}，{tag_text}。虽非雷劫大成，亦是道基添砖，灵力缓缓归海。"
+
+
+def cultivation_duration_text(duration_minutes: int) -> str:
+    if duration_minutes == 15:
+        return "一炷香"
+    if duration_minutes < 120 and duration_minutes % 15 == 0:
+        return f"{duration_minutes // 15} 刻"
+    if duration_minutes >= 120:
+        shichen = duration_minutes / 120.0
+        if duration_minutes % 120 == 0:
+            return f"{int(shichen)} 个时辰"
+        return f"约 {shichen:.1f} 个时辰"
+    return f"约 {duration_minutes} 分"
 
 
 def _duration_from_text(note: str) -> float | None:
     patterns = (
+        (r"(\d+(?:\.\d+)?)\s*(?:时辰)", 120.0),
         (r"(\d+(?:\.\d+)?)\s*(?:小时|个小时|h|hour|hours)", 60.0),
         (r"(\d+(?:\.\d+)?)\s*(?:分钟|分|min|mins|minute|minutes)", 1.0),
     )
@@ -367,10 +425,16 @@ def _duration_from_text(note: str) -> float | None:
     if chinese_match:
         return _parse_chinese_number(chinese_match.group(1)) * 60.0
 
+    shichen_match = re.search(r"([零一二两三四五六七八九十半]+)\s*时辰", note)
+    if shichen_match:
+        return _parse_chinese_number(shichen_match.group(1)) * 120.0
+
     minute_match = re.search(r"([零一二两三四五六七八九十]+)\s*(?:分钟|分)", note)
     if minute_match:
         return _parse_chinese_number(minute_match.group(1))
 
+    if "一炷香" in note:
+        return 15.0
     if "半小时" in note:
         return 30.0
     return None
@@ -397,6 +461,18 @@ def _dedupe(values: list[str]) -> list[str]:
         seen.add(value)
         result.append(value)
     return result
+
+
+def xianxia_tags(tags: list[str], event_type: str, estimated_delta: float) -> list[str]:
+    translated = [XIANXIA_TAGS.get(tag, tag) for tag in tags]
+    translated.insert(0, EVENT_TAGS.get(event_type, "灵机微动"))
+    if estimated_delta >= 28:
+        translated.append("灵压大涨")
+    elif estimated_delta > 0:
+        translated.append("道基微增")
+    elif estimated_delta < 0:
+        translated.append("魔念侵心")
+    return _dedupe(translated)[:5]
 
 
 def _extract_response_text(response: dict[str, Any]) -> str:

@@ -25,8 +25,10 @@ class ActivityAnalyzerTest(unittest.TestCase):
         self.assertEqual(result.duration_minutes, 120)
         self.assertGreater(result.quality, 1.2)
         self.assertGreater(result.estimated_delta, 30)
-        self.assertIn("baseline", result.tags)
-        self.assertIn("实验突破", result.feedback)
+        self.assertIn("炉基已成", result.tags)
+        self.assertIn("丹炉试炼", result.feedback)
+        self.assertNotIn("baseline", result.feedback)
+        self.assertNotIn("实验", result.feedback)
 
     def test_defaults_when_duration_is_missing(self) -> None:
         analyzer = ActivityAnalyzer(use_remote=False)
@@ -36,6 +38,7 @@ class ActivityAnalyzerTest(unittest.TestCase):
         self.assertEqual(result.duration_minutes, 60)
         self.assertGreater(result.estimated_delta, 8)
         self.assertGreater(result.confidence, 0.5)
+        self.assertIn("玉简开悟", result.tags)
 
 
 if __name__ == "__main__":

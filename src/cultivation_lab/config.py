@@ -21,14 +21,14 @@ EVENT_TYPES = (
 )
 
 EVENT_LABELS = {
-    "coding": "编码炼器",
-    "paper_reading": "参悟论文",
-    "experiment_run": "实验突破",
-    "writing": "凝练文稿",
+    "coding": "符阵炼器",
+    "paper_reading": "玉简参悟",
+    "experiment_run": "丹炉试炼",
+    "writing": "道卷成章",
     "meeting": "同门论道",
-    "debugging": "排障破阵",
-    "browsing": "杂念游荡",
-    "idle": "闭关走神",
+    "debugging": "破阵除障",
+    "browsing": "心猿游荡",
+    "idle": "神游太虚",
 }
 
 WEIGHTS = {

@@ -1,12 +1,12 @@
 const labels = {
-  coding: "编码炼器",
-  paper_reading: "参悟论文",
-  experiment_run: "实验突破",
-  writing: "凝练文稿",
+  coding: "符阵炼器",
+  paper_reading: "玉简参悟",
+  experiment_run: "丹炉试炼",
+  writing: "道卷成章",
   meeting: "同门论道",
-  debugging: "排障破阵",
-  browsing: "杂念游荡",
-  idle: "闭关走神",
+  debugging: "破阵除障",
+  browsing: "心猿游荡",
+  idle: "神游太虚",
 };
 
 const state = {
@@ -40,9 +40,18 @@ function escapeHtml(value) {
 
 function minutesText(seconds) {
   const minutes = Math.round(Number(seconds || 0) / 60);
-  if (minutes < 60) return `${minutes} 分钟`;
-  const hours = minutes / 60;
-  return `${hours.toFixed(hours >= 10 ? 0 : 1)} 小时`;
+  return cultivationTime(minutes);
+}
+
+function cultivationTime(minutes) {
+  const value = Math.round(Number(minutes || 0));
+  if (value === 15) return "一炷香";
+  if (value > 0 && value < 120 && value % 15 === 0) return `${value / 15} 刻`;
+  if (value >= 120) {
+    const shichen = value / 120;
+    return value % 120 === 0 ? `${shichen} 个时辰` : `约 ${shichen.toFixed(1)} 个时辰`;
+  }
+  return `约 ${value} 分`;
 }
 
 async function fetchJson(url, options) {
@@ -78,7 +87,7 @@ function renderState(snapshot) {
   $("#progressText").textContent = `${percent}%`;
   $("#progressBar").style.width = `${percent}%`;
   $("#nextRealm").textContent = progress.next_realm
-    ? `下一境界：${progress.next_realm}（${formatPower(progress.upper_bound)}）`
+    ? `下一重天：${progress.next_realm}（${formatPower(progress.upper_bound)}）`
     : "已达飞升期";
 
   const warnings = $("#warnings");
@@ -102,7 +111,7 @@ function renderSummary(summary) {
   const target = $("#summary");
   target.innerHTML = "";
   if (!summary.length) {
-    target.innerHTML = `<p class="empty">今日暂无行为数据。</p>`;
+    target.innerHTML = `<p class="empty">今日修行谱尚未落墨。</p>`;
     return;
   }
 
@@ -123,7 +132,7 @@ function renderLog(log) {
   const target = $("#log");
   target.innerHTML = "";
   if (!log.length) {
-    target.innerHTML = `<p class="empty">今天还没有修炼记录。</p>`;
+    target.innerHTML = `<p class="empty">今日玉简尚空，静候第一缕灵机。</p>`;
     return;
   }
 
@@ -150,23 +159,23 @@ function renderAnalysis(analysis, delta) {
   const target = $("#analysisResult");
   if (!analysis) {
     target.className = "analysis-result empty";
-    target.textContent = "输入一段修炼汇报后，这里会显示修为结果和评语。";
+    target.textContent = "呈上修行经过后，天机盘会显出灵力涨落与长老判词。";
     return;
   }
 
-  const source = analysis.source === "local_ai" ? "本地分析" : "AI 分析";
+  const source = analysis.source === "local_ai" ? "本地灵签" : "天机判词";
   const tagList = (analysis.tags || []).map((tag) => `<span>${escapeHtml(tag)}</span>`).join("");
   const resultDelta = Number(delta ?? analysis.estimated_delta);
   target.className = "analysis-result";
   target.innerHTML = `
     <div class="analysis-score">
-      <span>本次修为</span>
+      <span>本次灵力</span>
       <strong class="${resultDelta < 0 ? "negative" : ""}">${signed(resultDelta)}</strong>
     </div>
     <div class="analysis-meta">
-      <span>${analysis.duration_minutes} 分钟</span>
-      <span>质量 ${Number(analysis.quality).toFixed(2)}</span>
-      <span>把握 ${Math.round(analysis.confidence * 100)}%</span>
+      <span>${cultivationTime(analysis.duration_minutes)}</span>
+      <span>火候 ${Number(analysis.quality).toFixed(2)}</span>
+      <span>灵验 ${Math.round(analysis.confidence * 100)}%</span>
       <span>${escapeHtml(source)}</span>
     </div>
     <p>${escapeHtml(analysis.feedback)}</p>
@@ -184,7 +193,7 @@ async function submitEvent(event) {
 
   const note = $("#note").value.trim();
   if (!note) {
-    formStatus.textContent = "先说点内容";
+    formStatus.textContent = "请先呈上修行经过";
     submitting = false;
     return;
   }
@@ -203,7 +212,7 @@ async function submitEvent(event) {
     });
     renderAnalysis(result.analysis, result.accepted?.delta);
     $("#note").value = "";
-    formStatus.textContent = "已入账";
+    formStatus.textContent = "已入玉简";
     await refresh();
   } catch (error) {
     formStatus.textContent = error.message;
@@ -240,7 +249,7 @@ function setupVoiceInput() {
 
   if (!SpeechRecognition) {
     voiceButton.disabled = true;
-    voiceStatus.textContent = "当前浏览器不支持语音输入。";
+    voiceStatus.textContent = "此境暂无法传音，可改以手书。";
     return;
   }
 
@@ -254,8 +263,8 @@ function setupVoiceInput() {
   recognition.onstart = () => {
     listening = true;
     voiceBaseValue = note.value.trim();
-    voiceButton.textContent = "停止";
-    voiceStatus.textContent = "正在听你说。";
+    voiceButton.textContent = "止音";
+    voiceStatus.textContent = "传音阵已启。";
   };
 
   recognition.onresult = (event) => {
@@ -276,13 +285,13 @@ function setupVoiceInput() {
   };
 
   recognition.onerror = () => {
-    voiceStatus.textContent = "语音没听清，可以直接打字。";
+    voiceStatus.textContent = "传音受扰，可改以手书。";
   };
 
   recognition.onend = () => {
     listening = false;
-    voiceButton.textContent = "语音";
-    voiceStatus.textContent = note.value.trim() ? "已转成文字。" : "";
+    voiceButton.textContent = "传音";
+    voiceStatus.textContent = note.value.trim() ? "传音已落入玉简。" : "";
   };
 
   voiceButton.addEventListener("click", () => {
