@@ -16,10 +16,19 @@ const trackLabels = {
   master_phd: "硕博连修",
 };
 
+const defaultTrackYears = {
+  master: 3,
+  phd: 4,
+  direct_phd: 5,
+  master_phd: 6,
+};
+
 const state = {
   snapshot: null,
   report: null,
   track: null,
+  trackYears: null,
+  editingTrack: null,
 };
 
 const $ = (selector) => document.querySelector(selector);
@@ -66,27 +75,63 @@ function validTrack(track) {
   return Object.prototype.hasOwnProperty.call(trackLabels, track);
 }
 
+function normalizeYears(value, track = getCurrentTrack() || "master") {
+  const fallback = defaultTrackYears[track] || defaultTrackYears.master;
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return fallback;
+  return Math.round(Math.min(10, Math.max(1, parsed)) * 10) / 10;
+}
+
+function yearsText(value) {
+  const years = Number(value || 0);
+  return Number.isInteger(years) ? `${years} 年` : `${years.toFixed(1)} 年`;
+}
+
 function getCurrentTrack() {
   return validTrack(state.track) ? state.track : null;
 }
 
-function setCurrentTrack(track) {
+function getCurrentTrackYears() {
+  const track = getCurrentTrack();
+  if (!track) return null;
+  return normalizeYears(state.trackYears, track);
+}
+
+function setCurrentTrack(track, years) {
   if (!validTrack(track)) return;
   state.track = track;
+  state.trackYears = normalizeYears(years, track);
   localStorage.setItem("cultivationTrack", track);
+  localStorage.setItem("cultivationTrackYears", String(state.trackYears));
   renderTrack();
 }
 
 function renderTrack() {
   const track = getCurrentTrack();
   $("#currentTrackLabel").textContent = track ? trackLabels[track] : "未择定";
+  $("#currentTrackYears").textContent = track ? `标准 ${yearsText(getCurrentTrackYears())}` : "未定年限";
+  renderTrackDialog();
+}
+
+function renderTrackDialog() {
+  const activeTrack = validTrack(state.editingTrack) ? state.editingTrack : getCurrentTrack();
   for (const button of document.querySelectorAll("[data-track-choice]")) {
-    button.classList.toggle("is-active", button.dataset.trackChoice === track);
+    button.classList.toggle("is-active", button.dataset.trackChoice === activeTrack);
+  }
+  if (activeTrack && $("#trackYears")) {
+    const currentYears = activeTrack === getCurrentTrack() ? getCurrentTrackYears() : defaultTrackYears[activeTrack];
+    if (!$("#trackYears").value || Number($("#trackYears").value) !== currentYears) {
+      $("#trackYears").value = currentYears;
+    }
+    $("#trackYearsHint").textContent = `${trackLabels[activeTrack]}常用 ${yearsText(defaultTrackYears[activeTrack])}，可按你的学制改。`;
   }
 }
 
 function openTrackDialog(required = false) {
   const dialog = $("#trackDialog");
+  state.editingTrack = getCurrentTrack() || "master";
+  $("#trackYears").value = getCurrentTrackYears() || defaultTrackYears[state.editingTrack];
+  renderTrackDialog();
   dialog.classList.remove("is-hidden");
   dialog.dataset.required = required ? "true" : "false";
   $("#closeTrackDialog").hidden = required;
@@ -184,7 +229,8 @@ function renderLog(log) {
     const feedback = metadata.ai_feedback || metadata.note || minutesText(item.duration);
     const milestone = metadata.milestone || null;
     const detailText = milestone?.description || (metadata.tags || []).slice(0, 3).join(" · ") || minutesText(item.duration);
-    const detail = [metadata.track_label, detailText].filter(Boolean).join(" · ");
+    const yearDetail = metadata.track_years ? `标准 ${yearsText(metadata.track_years)}` : "";
+    const detail = [metadata.track_label, yearDetail, detailText].filter(Boolean).join(" · ");
     const milestoneHtml = milestone
       ? `<b class="log-milestone">${escapeHtml(milestone.title || metadata.milestone_title || "天机显化")}</b>`
       : "";
@@ -213,9 +259,14 @@ function renderAnalysis(analysis, delta) {
 
   const source = analysis.source === "local_ai" ? "本地灵签" : "天机判词";
   const trackName = analysis.track_label || trackLabels[analysis.track] || trackLabels[getCurrentTrack()];
+  const trackYearText = analysis.track_years ? yearsText(analysis.track_years) : yearsText(getCurrentTrackYears());
   const tagList = (analysis.tags || []).map((tag) => `<span>${escapeHtml(tag)}</span>`).join("");
   const resultDelta = Number(delta ?? analysis.estimated_delta);
   const milestone = analysis.milestone || null;
+  const yearFactorText =
+    milestone && Number(milestone.year_factor || 1) !== 1
+      ? ` · 年限 ${Number(milestone.year_factor).toFixed(2)}x`
+      : "";
   const milestoneBlock = milestone
     ? `
       <div class="milestone-banner">
@@ -226,7 +277,7 @@ function renderAnalysis(analysis, delta) {
         <p>${escapeHtml(milestone.description || milestone.feedback || "")}</p>
         <small>
           ${milestone.realm_target ? `直指 ${escapeHtml(milestone.realm_target)} · ` : ""}
-          额外灵力 ${signed(milestone.bonus_power || 0)}
+          额外灵力 ${signed(milestone.bonus_power || 0)}${yearFactorText}
         </small>
       </div>
     `
@@ -242,6 +293,7 @@ function renderAnalysis(analysis, delta) {
       <span>火候 ${Number(analysis.quality).toFixed(2)}</span>
       <span>灵验 ${Math.round(analysis.confidence * 100)}%</span>
       <span>${escapeHtml(trackName)}</span>
+      <span>标准 ${escapeHtml(trackYearText)}</span>
       <span>${escapeHtml(source)}</span>
     </div>
     ${milestoneBlock}
@@ -276,6 +328,7 @@ async function submitEvent(event) {
   const payload = {
     type: $("#eventType").value,
     track,
+    track_years: getCurrentTrackYears(),
     note,
     timestamp: Math.floor(Date.now() / 1000),
   };
@@ -309,23 +362,32 @@ function applyTemplate(event) {
 
 const eventForm = $("#eventForm");
 const savedTrack = localStorage.getItem("cultivationTrack");
+const savedTrackYears = localStorage.getItem("cultivationTrackYears");
 if (trackLabels[savedTrack]) {
   state.track = savedTrack;
+  state.trackYears = normalizeYears(savedTrackYears, savedTrack);
 } else {
   localStorage.removeItem("cultivationTrack");
+  localStorage.removeItem("cultivationTrackYears");
 }
 renderTrack();
 $("#changeTrackButton").addEventListener("click", () => openTrackDialog(false));
 $("#closeTrackDialog").addEventListener("click", closeTrackDialog);
+$("#saveTrackButton").addEventListener("click", () => {
+  const track = validTrack(state.editingTrack) ? state.editingTrack : getCurrentTrack() || "master";
+  setCurrentTrack(track, $("#trackYears").value);
+  closeTrackDialog();
+  $("#formStatus").textContent = "";
+});
 $("#trackDialog").addEventListener("click", (event) => {
   if (event.target === $("#trackDialog") && $("#trackDialog").dataset.required !== "true") {
     closeTrackDialog();
   }
   const button = event.target.closest("[data-track-choice]");
   if (!button) return;
-  setCurrentTrack(button.dataset.trackChoice);
-  closeTrackDialog();
-  $("#formStatus").textContent = "";
+  state.editingTrack = button.dataset.trackChoice;
+  $("#trackYears").value = defaultTrackYears[state.editingTrack] || defaultTrackYears.master;
+  renderTrackDialog();
 });
 if (!getCurrentTrack()) {
   openTrackDialog(true);

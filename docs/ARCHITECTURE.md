@@ -70,17 +70,19 @@ Natural-language entries are converted into the same contract. The analyzer stor
 {
   "track": "master_phd",
   "track_label": "硕博连修",
+  "track_years": 6.0,
   "quality": 1.34,
   "note": "跑了两个小时 baseline，定位了 loss 问题",
   "ai_feedback": "一线灵光贯穿泥丸宫...",
   "achievement_score": 80,
   "analysis_source": "local_ai or openai:<model>",
   "bonus_power": 1200,
+  "year_factor": 1.0,
   "realm_target": "渡劫期",
   "realm_floor_power": 3000
 }
 ```
 
 Milestone metadata is optional. When present, `bonus_power` is added to the ordinary weighted score, and `realm_floor_power` can lift the replayed state directly to a realm threshold.
-The analyzer accepts four tracks: `master`, `phd`, `direct_phd`, and `master_phd`. Track selection changes the milestone table for proposal, midterm/qualifying, thesis submission, paper submission/acceptance, and defense events.
-The current web dashboard stores the user's default track in browser local storage and sends it with note submissions; API callers may provide `track` per request.
+The analyzer accepts four tracks: `master`, `phd`, `direct_phd`, and `master_phd`. Track selection changes the milestone table for proposal, midterm/qualifying, thesis submission, paper submission/acceptance, and defense events. `track_years` mildly scales long-term milestone bonuses with a capped factor.
+The current web dashboard stores the user's default track and standard duration in browser local storage and sends them with note submissions; API callers may provide `track` and `track_years` per request.

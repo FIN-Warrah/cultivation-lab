@@ -16,6 +16,7 @@
           <div class="track-chip" aria-label="本命道途">
             <span>本命道途</span>
             <strong id="currentTrackLabel">未择定</strong>
+            <small id="currentTrackYears">未定年限</small>
             <button id="changeTrackButton" type="button">改道途</button>
           </div>
         </div>
@@ -166,6 +167,14 @@
             <strong>硕博连修</strong>
             <span>前后双劫，道火归一。</span>
           </button>
+        </div>
+        <label class="year-field">
+          标准年限
+          <input id="trackYears" type="number" min="1" max="10" step="0.5" inputmode="decimal" />
+        </label>
+        <div class="track-dialog-actions">
+          <span id="trackYearsHint">按常见学制预填，可自行改动。</span>
+          <button id="saveTrackButton" type="button">定下道途</button>
         </div>
       </div>
     </section>

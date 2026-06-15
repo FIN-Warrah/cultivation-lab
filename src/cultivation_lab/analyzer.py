@@ -10,10 +10,13 @@ from typing import Any
 
 from .config import (
     DEFAULT_ACADEMIC_TRACK,
+    DEFAULT_TRACK_YEARS,
     EVENT_LABELS,
     WEIGHTS,
     academic_track_label,
     normalize_academic_track,
+    normalize_track_years,
+    track_year_factor,
 )
 
 
@@ -129,6 +132,7 @@ class ActivityAnalysis:
     milestone: dict[str, Any] | None = None
     track: str = DEFAULT_ACADEMIC_TRACK
     track_label: str = academic_track_label(DEFAULT_ACADEMIC_TRACK)
+    track_years: float = DEFAULT_TRACK_YEARS[DEFAULT_ACADEMIC_TRACK]
     source: str = "local_ai"
 
     def to_dict(self) -> dict:
@@ -145,6 +149,7 @@ class ActivityAnalysis:
             "milestone": self.milestone,
             "track": self.track,
             "track_label": self.track_label,
+            "track_years": self.track_years,
             "source": self.source,
         }
 
@@ -157,24 +162,37 @@ class ActivityAnalyzer:
             self.remote = remote if remote is not None else OpenAIActivityAnalyzer.from_env()
         self.local = LocalActivityAnalyzer()
 
-    def analyze(self, event_type: str, note: str, track: str = DEFAULT_ACADEMIC_TRACK) -> ActivityAnalysis:
+    def analyze(
+        self,
+        event_type: str,
+        note: str,
+        track: str = DEFAULT_ACADEMIC_TRACK,
+        track_years: object = None,
+    ) -> ActivityAnalysis:
         if self.remote is not None:
             try:
-                return self.remote.analyze(event_type=event_type, note=note, track=track)
+                return self.remote.analyze(event_type=event_type, note=note, track=track, track_years=track_years)
             except AnalysisProviderError:
                 pass
-        return self.local.analyze(event_type=event_type, note=note, track=track)
+        return self.local.analyze(event_type=event_type, note=note, track=track, track_years=track_years)
 
 
 class LocalActivityAnalyzer:
-    def analyze(self, event_type: str, note: str, track: str = DEFAULT_ACADEMIC_TRACK) -> ActivityAnalysis:
+    def analyze(
+        self,
+        event_type: str,
+        note: str,
+        track: str = DEFAULT_ACADEMIC_TRACK,
+        track_years: object = None,
+    ) -> ActivityAnalysis:
         track = normalize_academic_track(track)
+        track_years = normalize_track_years(track, track_years)
         clean_note = " ".join((note or "").strip().split())
         duration_minutes, duration_confidence = infer_duration_minutes(clean_note, event_type)
         quality, tags = infer_quality(clean_note, event_type)
         weight = WEIGHTS.get(event_type, 0.0)
         base_delta = round(weight * (duration_minutes / 60.0) * quality, 2)
-        milestone = detect_milestone(clean_note, event_type, track=track)
+        milestone = apply_year_adjustment(detect_milestone(clean_note, event_type, track=track), track_years)
         estimated_delta = apply_milestone_delta(base_delta, milestone)
         cultivation_tags = xianxia_tags(tags, event_type, estimated_delta)
         if milestone:
@@ -207,6 +225,7 @@ class LocalActivityAnalyzer:
             milestone=milestone,
             track=track,
             track_label=academic_track_label(track),
+            track_years=track_years,
         )
 
 
@@ -241,8 +260,15 @@ class OpenAIActivityAnalyzer:
             timeout_seconds=_env_float("CULTIVATION_AI_TIMEOUT", 20.0),
         )
 
-    def analyze(self, event_type: str, note: str, track: str = DEFAULT_ACADEMIC_TRACK) -> ActivityAnalysis:
+    def analyze(
+        self,
+        event_type: str,
+        note: str,
+        track: str = DEFAULT_ACADEMIC_TRACK,
+        track_years: object = None,
+    ) -> ActivityAnalysis:
         track = normalize_academic_track(track)
+        track_years = normalize_track_years(track, track_years)
         label = EVENT_LABELS.get(event_type, event_type)
         track_label = academic_track_label(track)
         payload = {
@@ -263,6 +289,7 @@ class OpenAIActivityAnalyzer:
                     "content": (
                         f"行为类别: {event_type} / {label}\n"
                         f"本命道途: {track_label}\n"
+                        f"标准年限: {track_years} 年\n"
                         f"类别权重: {WEIGHTS.get(event_type, 0.0)}\n"
                         f"用户描述: {note}\n\n"
                         "请返回字段: duration_minutes(int,1-720), quality(number,0.25-1.85), "
@@ -322,7 +349,7 @@ class OpenAIActivityAnalyzer:
         if event_type in {"browsing", "idle"}:
             quality = min(quality, 1.0)
         base_delta = round(WEIGHTS.get(event_type, 0.0) * (duration_minutes / 60.0) * quality, 2)
-        milestone = detect_milestone(note, event_type, track=track)
+        milestone = apply_year_adjustment(detect_milestone(note, event_type, track=track), track_years)
         estimated_delta = apply_milestone_delta(base_delta, milestone)
         tags = xianxia_tags(_normalize_tags(parsed.get("tags")), event_type, estimated_delta)
         if milestone:
@@ -356,6 +383,7 @@ class OpenAIActivityAnalyzer:
             milestone=milestone,
             track=track,
             track_label=track_label,
+            track_years=track_years,
             source=f"openai:{self.model}",
         )
 
@@ -500,6 +528,7 @@ def detect_milestone(
             feedback="一线灵光贯穿泥丸宫，旧日关隘已有裂纹。此乃真悟，不必拘泥时辰，灵力当按大功记入。",
             confidence=0.84,
             track=track,
+            timeline_sensitive=False,
         )
 
     insight_terms = ("有所感", "悟到", "明白了", "理解了", "理清", "思路清楚", "有点理解")
@@ -515,6 +544,7 @@ def detect_milestone(
             feedback="心湖微明，灵机初现。此类感应虽未成雷霆，却能滋养后续关窍，宜趁热写入玉简。",
             confidence=0.78,
             track=track,
+            timeline_sensitive=False,
         )
 
     return None
@@ -841,6 +871,26 @@ def apply_milestone_delta(base_delta: float, milestone: dict[str, Any] | None) -
     return round(total, 2)
 
 
+def apply_year_adjustment(milestone: dict[str, Any] | None, track_years: object = None) -> dict[str, Any] | None:
+    if not milestone:
+        return None
+    adjusted = dict(milestone)
+    track = normalize_academic_track(adjusted.get("track"))
+    years = normalize_track_years(track, track_years)
+    adjusted["track_years"] = years
+    adjusted["year_factor"] = 1.0
+
+    if not adjusted.get("timeline_sensitive", True):
+        return adjusted
+
+    factor = track_year_factor(track, years)
+    base_bonus = float(adjusted.get("bonus_power") or 0)
+    adjusted["base_bonus_power"] = base_bonus
+    adjusted["bonus_power"] = round(base_bonus * factor, 2)
+    adjusted["year_factor"] = factor
+    return adjusted
+
+
 def _milestone(
     *,
     key: str,
@@ -853,6 +903,7 @@ def _milestone(
     feedback: str,
     confidence: float,
     track: str = DEFAULT_ACADEMIC_TRACK,
+    timeline_sensitive: bool = True,
 ) -> dict[str, Any]:
     track = normalize_academic_track(track)
     payload: dict[str, Any] = {
@@ -866,6 +917,7 @@ def _milestone(
         "confidence": confidence,
         "track": track,
         "track_label": academic_track_label(track),
+        "timeline_sensitive": timeline_sensitive,
     }
     if realm_target:
         payload["realm_target"] = realm_target
@@ -1049,6 +1101,7 @@ def analysis_metadata(analysis: ActivityAnalysis, note: str) -> dict:
         "tags": list(analysis.tags),
         "track": analysis.track,
         "track_label": analysis.track_label,
+        "track_years": analysis.track_years,
         "analysis_source": analysis.source,
     }
     if analysis.milestone:
@@ -1057,6 +1110,7 @@ def analysis_metadata(analysis: ActivityAnalysis, note: str) -> dict:
         metadata["milestone_key"] = milestone.get("key")
         metadata["milestone_title"] = milestone.get("title")
         metadata["bonus_power"] = milestone.get("bonus_power", 0)
+        metadata["year_factor"] = milestone.get("year_factor", 1.0)
         if milestone.get("realm_target"):
             metadata["realm_target"] = milestone.get("realm_target")
         if milestone.get("realm_floor_power") is not None:

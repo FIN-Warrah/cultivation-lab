@@ -107,14 +107,14 @@ The note analyzer uses this for breakthrough-style moments such as 有所感、�
 
 The dashboard uses the note-based endpoint by default. The browser voice button uses the built-in Web Speech API when available, converts speech to text locally in the browser, then sends the text to `/event/from-note`.
 
-The dashboard asks the user to choose an academic track on first use, stores it in browser local storage, and automatically attaches it to later note submissions. It can be changed from the main dashboard. API clients can still pass `track` explicitly:
+The dashboard asks the user to choose an academic track and standard duration on first use, stores both in browser local storage, and automatically attaches them to later note submissions. They can be changed from the main dashboard. API clients can still pass `track` and `track_years` explicitly:
 
 - `master`: 硕士一程
 - `phd`: 博士一程
 - `direct_phd`: 直博玄门
 - `master_phd`: 硕博连修
 
-The track changes milestone strength. For example, a master defense pass enters `大乘期`, while doctoral/direct-PhD final defenses can enter `飞升期`; `master_phd` treats an explicit 硕士答辩 as a front tribulation and 博士/ final defense as the second tribulation.
+Default durations are 3 years for master, 4 for PhD, 5 for direct PhD, and 6 for combined master-PhD. Custom durations mildly scale long-term milestone bonuses while keeping realm-floor breakthroughs stable. The track changes milestone strength. For example, a master defense pass enters `大乘期`, while doctoral/direct-PhD final defenses can enter `飞升期`; `master_phd` treats an explicit 硕士答辩 as a front tribulation and 博士/ final defense as the second tribulation.
 
 Realm thresholds:
 

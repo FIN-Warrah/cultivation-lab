@@ -47,6 +47,13 @@ ACADEMIC_TRACK_LABELS = {
     "master_phd": "硕博连修",
 }
 
+DEFAULT_TRACK_YEARS = {
+    "master": 3.0,
+    "phd": 4.0,
+    "direct_phd": 5.0,
+    "master_phd": 6.0,
+}
+
 ACADEMIC_TRACK_ALIASES = {
     "master_only": "master",
     "masters": "master",
@@ -104,3 +111,23 @@ def normalize_academic_track(value: object) -> str:
 def academic_track_label(track: object) -> str:
     normalized = normalize_academic_track(track)
     return ACADEMIC_TRACK_LABELS[normalized]
+
+
+def normalize_track_years(track: object, value: object = None) -> float:
+    normalized_track = normalize_academic_track(track)
+    default = DEFAULT_TRACK_YEARS[normalized_track]
+    if value is None or value == "":
+        return default
+    try:
+        years = float(value)
+    except (TypeError, ValueError):
+        return default
+    years = max(1.0, min(10.0, years))
+    return round(years, 1)
+
+
+def track_year_factor(track: object, value: object = None) -> float:
+    normalized_track = normalize_academic_track(track)
+    years = normalize_track_years(normalized_track, value)
+    factor = DEFAULT_TRACK_YEARS[normalized_track] / years
+    return round(max(0.85, min(1.15, factor)), 3)

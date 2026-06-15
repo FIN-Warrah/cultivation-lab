@@ -14,11 +14,13 @@ from .config import (
     ACADEMIC_TRACK_LABELS,
     ACADEMIC_TRACKS,
     DEFAULT_EVENTS_PATH,
+    DEFAULT_TRACK_YEARS,
     EVENT_LABELS,
     EVENT_TYPES,
     STATIC_DIR,
     WEIGHTS,
     normalize_academic_track,
+    normalize_track_years,
 )
 from .engine import CultivationEngine
 from .models import Event, ValidationError, utc_now_ts
@@ -48,6 +50,7 @@ class CultivationRequestHandler(BaseHTTPRequestHandler):
                     "event_labels": EVENT_LABELS,
                     "academic_tracks": ACADEMIC_TRACKS,
                     "academic_track_labels": ACADEMIC_TRACK_LABELS,
+                    "default_track_years": DEFAULT_TRACK_YEARS,
                     "weights": WEIGHTS,
                 }
             )
@@ -70,6 +73,7 @@ class CultivationRequestHandler(BaseHTTPRequestHandler):
                     "event_labels": EVENT_LABELS,
                     "academic_tracks": ACADEMIC_TRACKS,
                     "academic_track_labels": ACADEMIC_TRACK_LABELS,
+                    "default_track_years": DEFAULT_TRACK_YEARS,
                     "weights": WEIGHTS,
                 },
                 include_body=False,
@@ -163,8 +167,17 @@ class CultivationRequestHandler(BaseHTTPRequestHandler):
                 raise ValidationError("note is required.")
 
             track = normalize_academic_track(payload.get("track") or payload.get("academic_track"))
+            track_years = normalize_track_years(
+                track,
+                payload.get("track_years") or payload.get("standard_years") or payload.get("years"),
+            )
             timestamp = int(payload.get("timestamp") or utc_now_ts())
-            analysis = self.analyzer.analyze(event_type=event_type, note=note, track=track)
+            analysis = self.analyzer.analyze(
+                event_type=event_type,
+                note=note,
+                track=track,
+                track_years=track_years,
+            )
             event = Event.from_payload(
                 {
                     "type": event_type,

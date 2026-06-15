@@ -71,6 +71,7 @@ class ActivityAnalyzerTest(unittest.TestCase):
         result = analyzer.analyze("meeting", "今天博士毕业答辩顺利通过", track="phd")
 
         self.assertEqual(result.track, "phd")
+        self.assertEqual(result.track_years, 4.0)
         self.assertIsNotNone(result.milestone)
         self.assertEqual(result.milestone["title"], "天门大开")
         self.assertEqual(result.milestone["realm_target"], "飞升期")
@@ -110,12 +111,26 @@ class ActivityAnalyzerTest(unittest.TestCase):
     def test_breakthrough_gets_insight_bonus(self) -> None:
         analyzer = ActivityAnalyzer(use_remote=False)
 
-        result = analyzer.analyze("debugging", "卡了很久的关键问题今天终于想通并突破")
+        result = analyzer.analyze("debugging", "卡了很久的关键问题今天终于想通并突破", track_years=2)
 
         self.assertIsNotNone(result.milestone)
         self.assertEqual(result.milestone["title"], "有所悟")
         self.assertGreaterEqual(result.milestone["bonus_power"], 420)
+        self.assertEqual(result.milestone["bonus_power"], 420)
+        self.assertEqual(result.milestone["year_factor"], 1.0)
         self.assertIn("有所悟", result.tags)
+
+    def test_standard_years_scale_long_term_milestones(self) -> None:
+        analyzer = ActivityAnalyzer(use_remote=False)
+
+        result = analyzer.analyze("writing", "博士论文录用", track="phd", track_years=3)
+
+        self.assertEqual(result.track_years, 3.0)
+        self.assertIsNotNone(result.milestone)
+        self.assertEqual(result.milestone["title"], "仙门赐符")
+        self.assertEqual(result.milestone["base_bonus_power"], 1800)
+        self.assertEqual(result.milestone["bonus_power"], 2070)
+        self.assertEqual(result.milestone["year_factor"], 1.15)
 
 
 if __name__ == "__main__":
